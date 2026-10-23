@@ -1,0 +1,20 @@
+# Secrets - never upload
+.env
+**/.env
+*.key
+*.pem
+*credentials*.json
+
+# Python environment and caches
+.venv/
+__pycache__/
+*.pyc
+
+# Editor and OS files
+.vscode/
+.DS_Store
+
+# Data you upload while testing
+uploads/
+*.csv
+!sample_data/*.csv
