@@ -57,14 +57,41 @@ def _top_values(non_null, k=5):
 
 # ---------- type detection ----------
 
+_NUMERIC_DATE = re.compile(r"^\s*(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})\s*$")
+_ISO_START = r"^\s*\d{4}[-/.]\d{1,2}[-/.]\d{1,2}"
+
+
+def _guess_dayfirst(text):
+    """True if values like 25/12/2024 show the day comes first."""
+    first_big = second_big = False
+    for v in text.astype(str).head(2000):
+        m = _NUMERIC_DATE.match(v)
+        if m:
+            first_big |= int(m.group(1)) > 12
+            second_big |= int(m.group(2)) > 12
+    return first_big and not second_big
+
+
+def _to_datetime(series, dayfirst, mixed):
+    """Parse dates. Year-first (ISO) values are never treated as day-first."""
+    kwargs = {"format": "mixed"} if mixed else {}
+    if not dayfirst:
+        return pd.to_datetime(series, errors="coerce", **kwargs)
+    iso = series.astype(str).str.match(_ISO_START)
+    parsed_iso = pd.to_datetime(series.where(iso), errors="coerce", **kwargs)
+    parsed_rest = pd.to_datetime(series.where(~iso), errors="coerce", dayfirst=True, **kwargs)
+    return parsed_iso.fillna(parsed_rest)
+
+
 def _parse_dates(series):
     """Parse a text Series as dates. Return None if fewer than 90% parse."""
     needed = 0.9 * series.notna().sum()
+    dayfirst = _guess_dayfirst(series.dropna())
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        parsed = pd.to_datetime(series, errors="coerce")
+        parsed = _to_datetime(series, dayfirst, mixed=False)
         if parsed.notna().sum() < needed:
-            parsed = pd.to_datetime(series, errors="coerce", format="mixed")
+            parsed = _to_datetime(series, dayfirst, mixed=True)
     return parsed if parsed.notna().sum() >= needed else None
 
 
@@ -183,6 +210,15 @@ def _profile_column(name, s, n_rows):
                     info["top_values"] = _top_values(non_null)
                     notes.append(f"Many distinct values ({info['unique']}); hard to chart")
 
+    if info["role"] == "numeric" and numeric_values is not None:
+        v = numeric_values.dropna()
+        if (_name_tokens(name) & {"year", "yr", "fy"} and bool((v % 1 == 0).all())
+                and v.min() >= 1900 and v.max() <= 2100 and v.nunique() <= 60):
+            info["role"] = "categorical"
+            info["top_values"] = _top_values(v.astype(int))
+            notes.append("Year-like column treated as a category, not a measure")
+            numeric_values = None
+
     if info["unique"] == 1 and info["role"] != "empty":
         notes.append("Constant column (only one value)")
     if info["missing_pct"] >= 80:
@@ -232,6 +268,8 @@ def profile_dataframe(df):
     duplicates = int(df.duplicated().sum()) if n_cols else 0
     if n_rows and n_rows < 30:
         warns.append(f"Very small dataset ({n_rows} rows); charts may not be meaningful")
+    if n_cols > 50:
+        warns.append(f"Very wide dataset ({n_cols} columns); only the most useful will be charted")
     if duplicates:
         warns.append(f"{duplicates} duplicate rows")
     if len(set(df.columns)) != n_cols:

@@ -18,3 +18,4 @@ __pycache__/
 uploads/
 *.csv
 !sample_data/*.csv
+!sample_data/messy/*.csv
