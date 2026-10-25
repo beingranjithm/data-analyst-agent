@@ -12,6 +12,7 @@ from tools.charts import (AGG_FUNCS, ChartError, build_chart, compute_kpis,  # n
 from tools.cleaner import clean_dataframe  # noqa: E402
 from tools.loader import load_csv_bytes  # noqa: E402
 from tools.profiler import describe_column, profile_dataframe, profile_to_text  # noqa: E402
+from tools.sandbox import run_code  # noqa: E402
 
 st.set_page_config(page_title="Agentic Data Analyst", page_icon="📊", layout="wide")
 
@@ -100,7 +101,7 @@ df, profile = table["df"], table["profile"]
 d = profile["dataset"]
 st.subheader(f"Table: {table['name']}")
 
-tab_overview, tab_gallery, tab_builder = st.tabs(["Overview", "Chart gallery", "Build a chart"])
+tab_overview, tab_gallery, tab_builder, tab_sandbox = st.tabs(["Overview", "Chart gallery", "Build a chart", "Code sandbox"])
 
 # ============ TAB 1: OVERVIEW ============
 with tab_overview:
@@ -226,3 +227,61 @@ with tab_builder:
         show_chart(df, spec, key="builder_chart")
         with st.expander("Chart spec", expanded=True):
             st.json(spec)
+
+# ============ TAB 4: CODE SANDBOX (try the safety checks yourself) ============
+SANDBOX_EXAMPLES = {
+    "✅ Revenue by region (table)": "result = df.groupby('region')['revenue'].sum().reset_index()",
+    "✅ A chart": ("fig = px.bar(df.groupby('category', as_index=False)['revenue'].sum(),\n"
+                  "             x='category', y='revenue', title='Revenue by category')\n"
+                  "result = 'chart made'"),
+    "✅ Print and answer": "print('Rows:', len(df))\nresult = df['revenue'].sum()",
+    "❌ Wrong column name": "result = df['revenu'].sum()",
+    "❌ Read a secret file": "result = open('.env').read()",
+    "❌ Import os": "import os\nresult = os.listdir('/')",
+    "❌ Run a command": "import subprocess\nresult = subprocess.run(['ls'])",
+    "❌ Sneaky: via pandas internals": "result = pd.io.common.os.listdir('/home')",
+    "❌ Sneaky: DataSource": "result = np.lib.npyio.DataSource().open('/etc/passwd').read()",
+    "❌ Infinite loop": "while True:\n    pass",
+    "❌ Memory bomb": "x = [0] * (10 ** 10)",
+    "❌ Output flood": "for i in range(10 ** 6):\n    print('x' * 100)",
+}
+
+with tab_sandbox:
+    st.caption("This is where AI-written code will run. Try the examples, especially the red ones, "
+               "and watch which safety layer stops each attack.")
+    example = st.selectbox("Example code", list(SANDBOX_EXAMPLES))
+    code = st.text_area("Python code (use df, pd, np, px, go; put the answer in `result` or a Plotly figure in `fig`)",
+                        value=SANDBOX_EXAMPLES[example], height=180, key=f"sandbox_code_{example}")
+    cols = st.columns(3)
+    timeout_s = cols[0].number_input("Time limit (seconds)", 2, 60, 5)
+    memory = cols[1].number_input("Memory limit (MB)", 128, 4096, 1024, step=128)
+    skip_check = cols[2].checkbox("Skip the static check (tests the inner locks)")
+
+    if st.button("▶ Run in sandbox", type="primary"):
+        tables_for_run = {n: t["df"] for n, t in st.session_state["tables"].items()}
+        with st.spinner("Running..."):
+            res = run_code(code, tables_for_run, active=st.session_state["active_table"],
+                           timeout=int(timeout_s), memory_mb=int(memory), check=not skip_check)
+        if res.ok:
+            st.success(f"Ran successfully in {res.seconds}s")
+        elif res.status == "blocked":
+            st.error("🛑 Blocked before running (static check)")
+        else:
+            st.error(f"❌ {res.status.upper()}: {res.message()}")
+        if res.status == "blocked":
+            for p in res.problems:
+                st.write(f"- {p}")
+        if res.isolation == "none":
+            st.warning("The operating-system file lock (Landlock) is NOT active on this computer. "
+                       "Only the other layers protect you.")
+        elif res.isolation.startswith("landlock"):
+            st.caption(f"File-system lock: active ({res.isolation}) | time: {res.seconds}s")
+        if res.stdout:
+            st.text("Printed output:\n" + res.stdout[:3000])
+        if res.table is not None:
+            st.write(f"Result table ({res.table_total_rows} rows total):")
+            st.dataframe(res.table)
+        elif res.value is not None:
+            st.write("Result:", res.value)
+        if res.figure is not None:
+            st.plotly_chart(res.figure, key="sandbox_fig")
