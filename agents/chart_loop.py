@@ -18,6 +18,7 @@ from typing import Optional
 import pandas as pd
 
 from agents.chart_agent import DEFAULT_MODEL, ChartResult, make_chart_async
+from agents.resilience import DEFAULT_DELAYS
 from tools.plan_schema import ChartSpec
 
 MAX_ATTEMPTS = 3
@@ -108,12 +109,20 @@ def _same(a: Optional[str], b: Optional[str]) -> bool:
 
 
 async def make_chart_healing_async(df: pd.DataFrame, profile: dict, chart: ChartSpec,
-                                   model=DEFAULT_MODEL, max_attempts: int = MAX_ATTEMPTS) -> HealResult:
+                                   model=DEFAULT_MODEL, max_attempts: int = MAX_ATTEMPTS,
+                                   delays=DEFAULT_DELAYS, sleep=asyncio.sleep, on_wait=None) -> HealResult:
     history: list[Attempt] = []
     feedback = ""
     res: Optional[ChartResult] = None
     for n in range(1, max_attempts + 1):
         res = await make_chart_async(df, profile, chart, model, feedback=feedback)
+        waits = 0
+        while res.transient and waits < len(delays):
+            if on_wait:
+                on_wait(waits + 1, delays[waits], res.message[:200])
+            await sleep(delays[waits])
+            waits += 1
+            res = await make_chart_async(df, profile, chart, model, feedback=feedback)
         history.append(Attempt(n, res.ok, res.code, res.message))
         if res.ok:
             return HealResult(True, f"Chart built on attempt {n}.", res, history)
@@ -126,5 +135,7 @@ async def make_chart_healing_async(df: pd.DataFrame, profile: dict, chart: Chart
 
 
 def make_chart_healing(df: pd.DataFrame, profile: dict, chart: ChartSpec,
-                       model=DEFAULT_MODEL, max_attempts: int = MAX_ATTEMPTS) -> HealResult:
-    return asyncio.run(make_chart_healing_async(df, profile, chart, model, max_attempts))
+                       model=DEFAULT_MODEL, max_attempts: int = MAX_ATTEMPTS,
+                       delays=DEFAULT_DELAYS, sleep=asyncio.sleep, on_wait=None) -> HealResult:
+    return asyncio.run(make_chart_healing_async(df, profile, chart, model, max_attempts,
+                                                delays=delays, sleep=sleep, on_wait=on_wait))

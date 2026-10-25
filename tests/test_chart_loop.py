@@ -110,7 +110,7 @@ def test_stops_when_the_model_repeats_itself(df):
 
 
 def test_model_failure_is_not_retried(df):
-    llm, res = heal(df, ["unused"], explode=True)
+    llm, res = heal(df, ["unused"], explode=True, delays=())
     assert not res.ok and res.attempts == 1 and len(llm.seen) == 1 and "429" in res.message
 
 

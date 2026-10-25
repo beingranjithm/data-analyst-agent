@@ -16,6 +16,7 @@ from google.adk import Agent
 from google.adk.runners import InMemoryRunner
 from google.genai import types
 
+from agents.resilience import describe_model_error, is_transient_error
 from tools.plan_schema import ChartSpec
 from tools.profiler import profile_to_text
 from tools.sandbox import RunResult, run_code
@@ -60,6 +61,7 @@ class ChartResult:
     run: Optional[RunResult] = None   # sandbox result (None if code never reached the sandbox)
     raw: str = ""                     # the model's raw reply
     model_error: bool = False         # True when the MODEL CALL failed (rate limit, network), not the code
+    transient: bool = False           # True when waiting and asking again may work (busy server, per-minute limit)
 
     @property
     def figure(self):
@@ -109,7 +111,8 @@ async def make_chart_async(df: pd.DataFrame, profile: dict, chart: ChartSpec,
     try:
         raw = await _ask_model(model, profile_text, chart_json, feedback)
     except Exception as e:  # rate limit, network, bad key, ...
-        return ChartResult(False, f"Model call failed: {type(e).__name__}: {str(e)[:300]}", model_error=True)
+        return ChartResult(False, "Model call failed: " + describe_model_error(e), model_error=True,
+                           transient=is_transient_error(e))
 
     code = extract_code(raw)
     if code is None:
