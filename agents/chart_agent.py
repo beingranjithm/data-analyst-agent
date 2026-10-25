@@ -43,6 +43,7 @@ ENVIRONMENT
 RULES
 - Use column names exactly as written in the profile.
 - Sum amounts (revenue, units, cost). Average rates, prices, discounts and scores.
+- Do not assume a currency: use no currency symbol ($, EUR, GBP ...) unless the profile names one.
 - Use the given chart title as the figure title and label the axes clearly.
 - Show at most 15 categories (the largest). Sort bars from largest to smallest.
 - If rows are left out because a needed column is missing, add a small annotation
@@ -58,6 +59,7 @@ class ChartResult:
     code: Optional[str] = None        # the code the model wrote (None if none was found)
     run: Optional[RunResult] = None   # sandbox result (None if code never reached the sandbox)
     raw: str = ""                     # the model's raw reply
+    model_error: bool = False         # True when the MODEL CALL failed (rate limit, network), not the code
 
     @property
     def figure(self):
@@ -101,13 +103,13 @@ async def _ask_model(model, profile_text: str, chart_json: str, feedback: str = 
 
 
 async def make_chart_async(df: pd.DataFrame, profile: dict, chart: ChartSpec,
-                           model=DEFAULT_MODEL) -> ChartResult:
+                           model=DEFAULT_MODEL, feedback: str = "") -> ChartResult:
     chart_json = json.dumps({"title": chart.title, "why": chart.why, "spec": chart.to_spec()}, indent=2)
     profile_text = profile_to_text(profile)  # outside the try: a bug here must not look like a model failure
     try:
-        raw = await _ask_model(model, profile_text, chart_json)
+        raw = await _ask_model(model, profile_text, chart_json, feedback)
     except Exception as e:  # rate limit, network, bad key, ...
-        return ChartResult(False, f"Model call failed: {type(e).__name__}: {str(e)[:300]}")
+        return ChartResult(False, f"Model call failed: {type(e).__name__}: {str(e)[:300]}", model_error=True)
 
     code = extract_code(raw)
     if code is None:
