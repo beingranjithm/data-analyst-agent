@@ -40,8 +40,8 @@ class CacheMiss(RuntimeError):
     """replay mode: the cache has no saved reply for this request."""
 
 
-def request_key(model: str, llm_request) -> str:
-    """A fingerprint of everything that decides the model's answer."""
+def key_parts(model: str, llm_request) -> dict:
+    """Everything that decides the model's answer (the cache key is a hash of this)."""
     cfg = llm_request.config
     schema = getattr(cfg, "response_schema", None) if cfg else None
     if schema is not None and hasattr(schema, "model_json_schema"):
@@ -55,7 +55,16 @@ def request_key(model: str, llm_request) -> str:
         "temperature": getattr(cfg, "temperature", None),
         "tools": str(getattr(cfg, "tools", "") or ""),
     }
+    return parts
+
+
+def request_key(model: str, llm_request) -> str:
+    parts = key_parts(model, llm_request)
     return hashlib.sha256(json.dumps(parts, sort_keys=True, default=str).encode()).hexdigest()
+
+
+def _short(value) -> str:
+    return hashlib.sha256(json.dumps(value, sort_keys=True, default=str).encode()).hexdigest()[:6]
 
 
 def _final_text(responses: list) -> Optional[str]:
@@ -140,13 +149,17 @@ class CachingLlm(BaseLlm):
     async def generate_content_async(self, llm_request, stream=False):
         use_cache = self.mode != "off" and not stream
         key = request_key(self.model, llm_request) if use_cache else None
+        tag = f" [key {key[:6]}]" if key else ""
+        if use_cache and os.getenv("LLM_TRACE") == "2":
+            _trace(f"{self.model}: request parts " + " ".join(
+                f"{k}={_short(v)}" for k, v in key_parts(self.model, llm_request).items()))
         if use_cache:
             hit = self._load().get(key)
             if hit is None:                  # another CachingLlm object may have saved it since we loaded
                 hit = self._read_disk().get(key)
             if hit is not None:
                 self.hits += 1
-                _trace(f"{self.model}: replayed from cache")
+                _trace(f"{self.model}: replayed from cache{tag}")
                 yield LlmResponse(content=types.Content(role="model", parts=[types.Part(text=hit["text"])]))
                 return
         if self.mode == "replay":
@@ -156,7 +169,7 @@ class CachingLlm(BaseLlm):
             raise RuntimeError("CachingLlm has no inner model to call.")
         await self._pace()
         self.real_calls += 1
-        _trace(f"{self.model}: REAL request")
+        _trace(f"{self.model}: REAL request{tag}")
         request = llm_request.model_copy(update={"model": self.model})
         responses = []
         try:
