@@ -2,6 +2,8 @@
     python scripts/live_dashboard.py            (AI plan + AI charts: about 5 to 20 Gemini calls)
     python scripts/live_dashboard.py --no-ai    (rule-based only: NO Gemini calls, no key needed)
     python scripts/live_dashboard.py --max-charts 3   (AI, but only 3 charts: saves free-tier quota)
+    python scripts/live_dashboard.py --replay   (re-use saved model replies: NO requests, no key needed)
+    python scripts/live_dashboard.py --no-cache (ignore the saved replies and ask the models again)
 Only the text profile, chart specs and scrubbed error messages go to Gemini, never rows.
 Writes /tmp/dashboard_day11.html (open it with: xdg-open /tmp/dashboard_day11.html).
 """
@@ -15,9 +17,10 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 USE_AI = "--no-ai" not in sys.argv
+MODE = "replay" if "--replay" in sys.argv else ("off" if "--no-cache" in sys.argv else "use")
 MAX_CHARTS = int(sys.argv[sys.argv.index("--max-charts") + 1]) if "--max-charts" in sys.argv else None
 
-if USE_AI:
+if USE_AI and MODE != "replay":
     from dotenv import load_dotenv
 
     load_dotenv(ROOT / "hello_agent" / ".env")
@@ -25,6 +28,7 @@ if USE_AI:
         sys.exit("No API key found in hello_agent/.env (expected GOOGLE_API_KEY=...). Nothing was sent.")
 
 from agents.dashboard import build_dashboard
+from agents.llm_factory import make_llm
 from agents.resilience import quiet_adk_logs
 from tools.cleaner import clean_dataframe
 from tools.loader import load_csv_bytes
@@ -41,7 +45,10 @@ def progress(stage, done, total, message):
 
 
 t0 = time.time()
-d = build_dashboard(df, profile, use_ai=USE_AI, max_charts=MAX_CHARTS, progress=progress)
+planner_llm = make_llm("planner", mode=MODE) if USE_AI else None
+chart_llm = make_llm("chart", mode=MODE) if USE_AI else None
+d = build_dashboard(df, profile, use_ai=USE_AI, max_charts=MAX_CHARTS, progress=progress,
+                    planner_model=planner_llm, chart_model=chart_llm)
 print(f"\nDone in {time.time() - t0:.0f}s.  mode={d.mode}")
 print(f"TITLE: {d.title}\nSUMMARY: {d.summary}")
 for n in d.notes:
@@ -78,3 +85,6 @@ for c in d.failed_charts:
     parts.append(f"<p style='color:#b00'>Chart skipped: {html.escape(c.spec.title)}: {html.escape(c.message[:300])}</p>")
 Path("/tmp/dashboard_day11.html").write_text("<html><body style='font-family:sans-serif;max-width:1000px;margin:auto'>" + "".join(parts) + "</body></html>")
 print("saved: /tmp/dashboard_day11.html")
+for name, llm in (("planner", planner_llm), ("chart", chart_llm)):
+    if llm is not None:
+        print(f"{name} models -> {llm.summary()}")

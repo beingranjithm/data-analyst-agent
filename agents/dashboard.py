@@ -85,7 +85,7 @@ def _finish(fig, chart: ChartSpec):
 async def build_dashboard_async(df: pd.DataFrame, profile: dict, model=DEFAULT_MODEL, *, use_ai: bool = True,
                                 max_charts: Optional[int] = None, max_attempts: int = MAX_ATTEMPTS,
                                 progress: Optional[Progress] = None, delays=DEFAULT_DELAYS,
-                                sleep=asyncio.sleep) -> Dashboard:
+                                sleep=asyncio.sleep, planner_model=None, chart_model=None) -> Dashboard:
     notes: list[str] = []
 
     def emit(stage: str, done: int, total: int, message: str):
@@ -104,7 +104,7 @@ async def build_dashboard_async(df: pd.DataFrame, profile: dict, model=DEFAULT_M
     if use_ai:
         emit("planning", 0, 0, "Planning the dashboard ...")
         try:
-            res = await with_backoff(lambda: plan_dashboard_async(profile, model), delays=delays,
+            res = await with_backoff(lambda: plan_dashboard_async(profile, planner_model or model), delays=delays,
                                      sleep=sleep, on_wait=on_wait)
             if res.ok:
                 plan, mode = res.plan, "ai"
@@ -133,7 +133,7 @@ async def build_dashboard_async(df: pd.DataFrame, profile: dict, model=DEFAULT_M
         emit("chart", i - 1, len(charts), f"Building chart {i} of {len(charts)}: {chart.title}")
         ai_message, attempts, code = "", 0, None
         if ai_available:
-            heal = await make_chart_healing_async(df, profile, chart, model, max_attempts,
+            heal = await make_chart_healing_async(df, profile, chart, chart_model or model, max_attempts,
                                                   delays=delays, sleep=sleep, on_wait=on_wait)
             attempts, code = heal.attempts, heal.code
             if heal.ok:
