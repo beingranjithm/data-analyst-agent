@@ -13,6 +13,7 @@ import asyncio
 import hashlib
 import json
 import os
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,6 +28,12 @@ DEFAULT_CACHE_PATH = Path(__file__).resolve().parent.parent / ".cache" / "llm_ca
 MODES = ("use", "replay", "off")
 _now = time.monotonic          # replaced in tests
 _sleep = asyncio.sleep         # replaced in tests
+
+
+def _trace(message: str) -> None:
+    """One line per model event when the environment variable LLM_TRACE is set."""
+    if os.getenv("LLM_TRACE"):
+        print(f"[llm] {message}", file=sys.stderr, flush=True)
 
 
 class CacheMiss(RuntimeError):
@@ -96,9 +103,19 @@ class CachingLlm(BaseLlm):
                 self._store = {}
         return self._store
 
+    def _read_disk(self) -> dict:
+        try:
+            data = json.loads(Path(self.path).read_text())
+            return data if isinstance(data, dict) else {}
+        except (OSError, ValueError):
+            return {}
+
     def _save(self) -> None:
         p = Path(self.path)
         p.parent.mkdir(parents=True, exist_ok=True)
+        merged = self._read_disk()          # other CachingLlm objects may have saved since we loaded
+        merged.update(self._store)
+        self._store = merged
         tmp = p.with_suffix(p.suffix + ".tmp")
         tmp.write_text(json.dumps(self._store, indent=1))
         os.replace(tmp, p)
@@ -116,6 +133,7 @@ class CachingLlm(BaseLlm):
         if self.min_interval > 0 and self._last_real is not None:
             wait = self._last_real + self.min_interval - _now()
             if wait > 0:
+                _trace(f"{self.model}: waiting {wait:.1f}s (request pacing)")
                 await _sleep(wait)
         self._last_real = _now()
 
@@ -124,23 +142,33 @@ class CachingLlm(BaseLlm):
         key = request_key(self.model, llm_request) if use_cache else None
         if use_cache:
             hit = self._load().get(key)
+            if hit is None:                  # another CachingLlm object may have saved it since we loaded
+                hit = self._read_disk().get(key)
             if hit is not None:
                 self.hits += 1
+                _trace(f"{self.model}: replayed from cache")
                 yield LlmResponse(content=types.Content(role="model", parts=[types.Part(text=hit["text"])]))
                 return
         if self.mode == "replay":
+            _trace(f"{self.model}: not in the cache (replay-only mode)")
             raise CacheMiss("No saved reply for this request (replay-only mode).")
         if self.inner is None:
             raise RuntimeError("CachingLlm has no inner model to call.")
         await self._pace()
         self.real_calls += 1
+        _trace(f"{self.model}: REAL request")
         request = llm_request.model_copy(update={"model": self.model})
         responses = []
-        async for r in self.inner.generate_content_async(request, stream=stream):
-            responses.append(r)
-            yield r
+        try:
+            async for r in self.inner.generate_content_async(request, stream=stream):
+                responses.append(r)
+                yield r
+        except Exception as e:
+            _trace(f"{self.model}: ERROR {type(e).__name__}: {' '.join(str(e).split())[:110]}")
+            raise
         if use_cache:
             text = _final_text(responses)
+            _trace(f"{self.model}: answered ({len(text or '')} characters{', saved' if text else ', not saved'})")
             if text:
                 self._load()[key] = {"text": text, "model": self.model,
                                      "saved": datetime.now(timezone.utc).isoformat(timespec="seconds")}

@@ -8,7 +8,7 @@ from typing import Any
 from google.adk.models.base_llm import BaseLlm, LlmCapabilities
 from pydantic import PrivateAttr
 
-from agents.llm_cache import CacheMiss
+from agents.llm_cache import CacheMiss, _trace
 from agents.resilience import is_daily_quota_error
 
 
@@ -35,6 +35,7 @@ class FallbackLlm(BaseLlm):
         last: Any = None
         for llm in self.chain:
             if llm.model in self._exhausted:
+                _trace(f"{llm.model}: skipped (daily quota already used up)")
                 continue
             request = llm_request.model_copy(update={"model": llm.model})
             try:
@@ -47,5 +48,6 @@ class FallbackLlm(BaseLlm):
                 if not is_daily_quota_error(f"{type(e).__name__}: {e}"):
                     raise
                 self._exhausted.add(llm.model)
+                _trace(f"{llm.model}: daily quota used up, trying the next model")
                 last = e
         raise last or RuntimeError("No model is available (the whole chain is used up).")
