@@ -12,12 +12,12 @@ from agents.llm_fallback import FallbackLlm
 
 # first = preferred, the rest are used only when the earlier model's DAILY quota is used up
 ROLE_MODELS = {
-    "planner": ["gemini-3.6-flash", "gemini-3.5-flash-lite"],     # 1 request per dashboard
-    "chart": ["gemini-3.5-flash-lite", "gemini-3.6-flash"],       # many requests per dashboard
-    "chat": ["gemini-3.5-flash-lite", "gemini-3.6-flash"],
+    "planner": ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"],   # 1 request per dashboard
+    "chart": ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.6-flash"],     # many requests per dashboard
+    "chat": ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.6-flash"],
 }
 # seconds between real requests = 60 / requests-per-minute, plus a little margin
-MIN_INTERVAL = {"gemini-3.6-flash": 12.5, "gemini-3.5-flash-lite": 4.5}
+MIN_INTERVAL = {"gemini-3.6-flash": 12.5, "gemini-3.5-flash-lite": 4.5, "gemini-3.1-flash-lite": 4.5}
 DEFAULT_INTERVAL = 12.5
 
 
