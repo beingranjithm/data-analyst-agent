@@ -82,27 +82,17 @@ def _finish(fig, chart: ChartSpec):
     return fig, check.problems, check.warnings
 
 
-async def build_dashboard_async(df: pd.DataFrame, profile: dict, model=DEFAULT_MODEL, *, use_ai: bool = True,
-                                max_charts: Optional[int] = None, max_attempts: int = MAX_ATTEMPTS,
-                                progress: Optional[Progress] = None, delays=DEFAULT_DELAYS,
-                                sleep=asyncio.sleep, planner_model=None, chart_model=None) -> Dashboard:
-    notes: list[str] = []
-
-    def emit(stage: str, done: int, total: int, message: str):
-        if progress:
-            try:
-                progress(stage, done, total, message)
-            except Exception:       # a broken progress display must never break the build
-                pass
-
-    def on_wait(n: int, seconds: float, reason: str):
-        emit("waiting", 0, 0, f"Google is busy. Waiting {seconds:.0f}s before retry {n}. ({reason[:80]})")
-
-    # ---- 1. the plan ----
+async def make_plan_async(profile: dict, model=DEFAULT_MODEL, *, use_ai: bool = True,
+                          max_charts: Optional[int] = None, planner_model=None, delays=DEFAULT_DELAYS,
+                          sleep=asyncio.sleep, emit=None, on_wait=None, notes: Optional[list] = None):
+    """Step 1 of a dashboard: the plan. Returns (plan, mode).
+    Model problems never raise: the rule-based gallery takes over and the reason is added to `notes`."""
+    notes = notes if notes is not None else []
     plan: Optional[DashboardPlan] = None
     mode = "rule-based"
     if use_ai:
-        emit("planning", 0, 0, "Planning the dashboard ...")
+        if emit:
+            emit("planning", 0, 0, "Planning the dashboard ...")
         try:
             res = await with_backoff(lambda: plan_dashboard_async(profile, planner_model or model), delays=delays,
                                      sleep=sleep, on_wait=on_wait)
@@ -117,6 +107,34 @@ async def build_dashboard_async(df: pd.DataFrame, profile: dict, model=DEFAULT_M
             notes.append("Used the rule-based chart gallery instead of an AI plan.")
     if plan is None:
         plan = _gallery_plan(profile, max_charts, notes)
+    return plan, mode
+
+
+async def build_dashboard_async(df: pd.DataFrame, profile: dict, model=DEFAULT_MODEL, *, use_ai: bool = True,
+                                max_charts: Optional[int] = None, max_attempts: int = MAX_ATTEMPTS,
+                                progress: Optional[Progress] = None, delays=DEFAULT_DELAYS,
+                                sleep=asyncio.sleep, planner_model=None, chart_model=None,
+                                plan_override: Optional[DashboardPlan] = None, plan_mode: str = "ai",
+                                plan_notes: Optional[list] = None) -> Dashboard:
+    notes: list[str] = list(plan_notes or [])
+
+    def emit(stage: str, done: int, total: int, message: str):
+        if progress:
+            try:
+                progress(stage, done, total, message)
+            except Exception:       # a broken progress display must never break the build
+                pass
+
+    def on_wait(n: int, seconds: float, reason: str):
+        emit("waiting", 0, 0, f"Google is busy. Waiting {seconds:.0f}s before retry {n}. ({reason[:80]})")
+
+    # ---- 1. the plan ----
+    if plan_override is not None:             # a plan that a person already approved (see approval_workflow.py)
+        plan, mode = plan_override, plan_mode
+    else:
+        plan, mode = await make_plan_async(profile, model, use_ai=use_ai, max_charts=max_charts,
+                                           planner_model=planner_model, delays=delays, sleep=sleep,
+                                           emit=emit, on_wait=on_wait, notes=notes)
     charts = list(plan.charts[:max_charts] if max_charts else plan.charts)
 
     # ---- 2. KPIs ----
