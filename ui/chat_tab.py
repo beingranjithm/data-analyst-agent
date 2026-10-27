@@ -1,8 +1,9 @@
-"""The "Chat" tab (Day 14): ask questions about the dataset in plain language.
+"""The "Chat" tab (Days 14-15): ask questions about the dataset in plain language.
 
-The chat agent sees only the data SUMMARY (the profile), never your rows, so it can describe the dataset but
-cannot yet calculate new numbers (that arrives with Day 15). The conversation lives in st.session_state as a
-ChatSession; numbers in an answer that are not in the summary get a visible warning.
+The chat agent sees the data SUMMARY (the profile), never the table. For questions that need numbers it writes
+pandas code, which runs in the sandbox on your computer; the AI then sees only a small, size-capped result.
+The conversation lives in st.session_state as a ChatSession. Numbers in an answer that are in neither the
+summary nor a calculation result get a visible warning, and every calculation can be inspected.
 Do not click other widgets while an answer is being written: Streamlit would restart the script.
 """
 from typing import Callable, Optional
@@ -13,7 +14,10 @@ from ui.dashboard_tab import CACHE_MODES, PRIVACY_NOTE, api_key_available, usage
 
 SETTING_KEYS = ("chat_saved_mode",)          # kept when the dataset changes (ordinary keys: see dashboard_tab)
 LIMIT_NOTE = ("ℹ️ I answer from a summary of the data (column types, ranges, averages, categories). I cannot "
-              "calculate new numbers from the rows yet; when a question needs that, I will say so.")
+              "calculate new numbers from the rows; when a question needs that, I will say so.")
+CALC_NOTE = ("🧮 For questions that need numbers, the AI writes pandas code that runs in a locked-down sandbox on "
+             "your computer. The AI sees only a small result (at most 20 rows), never the whole table. "
+             "Open \"Show the calculation\" under an answer to check the code and the result.")
 
 
 def default_session_factory(profile, settings):
@@ -21,7 +25,7 @@ def default_session_factory(profile, settings):
     from agents.chat_agent import ChatSession
     from agents.llm_factory import make_llm
     model = make_llm("chat", mode=settings["cache_mode"])
-    return ChatSession(profile, model)
+    return ChatSession(profile, model, tables=settings.get("df"))
 
 
 def _clear_chat():
@@ -30,20 +34,43 @@ def _clear_chat():
         del ss[key]
 
 
-def _show_history(session, notes):
+def _show_calculations(calcs):
+    failed = [c for c in calcs if not c.ok]
+    label = "⚠ The calculation failed" if failed and len(failed) == len(calcs) else "🧮 Show the calculation"
+    with st.expander(label):
+        for n, c in enumerate(calcs, 1):
+            if len(calcs) > 1:
+                st.caption(f"Calculation {n}" + ("" if c.ok else " (failed)"))
+            st.code(c.code, language="python")
+            st.text(("Result shown to the AI:\n" if c.ok else "Error:\n") + c.result_text)
+
+
+def _show_history(session, notes, calcs):
     for i, (role, text) in enumerate(session.transcript):
         with st.chat_message("user" if role == "user" else "assistant"):
             st.markdown(text)
+            if calcs.get(i):
+                _show_calculations(calcs[i])
             numbers = notes.get(i)
             if numbers:
                 st.warning("These numbers are not in the data summary, so please double-check them: "
                            + ", ".join(numbers))
 
 
-def render_chat(profile, data_key: str, *, session_factory: Optional[Callable] = None):
-    """Draws the tab. `data_key` identifies the dataset: a new key starts a new conversation.
-    `session_factory(profile, settings)` can replace the real models (tests do)."""
+def _starters(profile, can_calculate):
+    """Starter questions; with data to calculate on, one of them needs a real calculation."""
     from agents.chat_agent import starter_questions
+    qs = starter_questions(profile)
+    measures, dims = profile.get("measures"), profile.get("dimensions")
+    if can_calculate and measures and dims:
+        return qs[:3] + [f"Which {dims[0]} has the highest total {measures[0]}?"]
+    return qs
+
+
+def render_chat(profile, data_key: str, *, df=None, session_factory: Optional[Callable] = None):
+    """Draws the tab. `data_key` identifies the dataset: a new key starts a new conversation.
+    `df` is the data the AI may calculate on (None = answer from the summary only).
+    `session_factory(profile, settings)` can replace the real models (tests do); settings holds the data as "df"."""
     ss = st.session_state
     if ss.get("chat_data_key") != data_key:
         _clear_chat()
@@ -61,7 +88,7 @@ def render_chat(profile, data_key: str, *, session_factory: Optional[Callable] =
     if session_factory is None and needs_key and not api_key_available():
         st.error("No Gemini API key found. Put GOOGLE_API_KEY=... in hello_agent/.env, or choose 'Replay only'.")
         blocked = True
-    st.caption(LIMIT_NOTE)
+    st.caption(CALC_NOTE if df is not None else LIMIT_NOTE)
 
     if ss.get("chat_mode") != mode:                 # a different reply setting means a different model object
         ss.pop("chat_session", None)
@@ -69,10 +96,11 @@ def render_chat(profile, data_key: str, *, session_factory: Optional[Callable] =
     session = ss.get("chat_session")
     transcript_kept = session.transcript if session is not None else ss.get("chat_kept", [])
     notes = ss.setdefault("chat_notes", {})
+    calcs = ss.setdefault("chat_calcs", {})
 
     if session is None and not blocked:
         try:
-            session = (session_factory or default_session_factory)(profile, {"cache_mode": mode})
+            session = (session_factory or default_session_factory)(profile, {"cache_mode": mode, "df": df})
         except Exception as e:
             st.error(f"Could not start the chat: {type(e).__name__}: {e}")
             return
@@ -81,12 +109,12 @@ def render_chat(profile, data_key: str, *, session_factory: Optional[Callable] =
     if session is None:
         return
 
-    _show_history(session, notes)
+    _show_history(session, notes, calcs)
 
     question = None
     if not session.transcript:
         st.write("**Try one of these:**")
-        for i, q in enumerate(starter_questions(profile)):
+        for i, q in enumerate(_starters(profile, df is not None)):
             if st.button(q, key=f"chat_starter_{i}"):
                 question = q
     typed = st.chat_input("Ask a question about this dataset", key="chat_input")
@@ -105,6 +133,8 @@ def render_chat(profile, data_key: str, *, session_factory: Optional[Callable] =
         if reply.ok:
             if reply.ungrounded:
                 notes[len(session.transcript) - 1] = reply.ungrounded
+            if reply.calculations:
+                calcs[len(session.transcript) - 1] = reply.calculations
         else:
             ss["chat_error"] = reply.error
         ss["chat_kept"] = list(session.transcript)
@@ -114,7 +144,7 @@ def render_chat(profile, data_key: str, *, session_factory: Optional[Callable] =
         a, b = st.columns([1, 3])
         if a.button("Start a new conversation", key="chat_reset"):
             session.reset()
-            ss["chat_notes"], ss["chat_kept"] = {}, []
+            ss["chat_notes"], ss["chat_calcs"], ss["chat_kept"] = {}, {}, []
             st.rerun()
         real, replayed = usage_of(getattr(session, "model", None))
         b.caption(f"AI requests in this chat: {real} real, {replayed} replayed from saved replies.")

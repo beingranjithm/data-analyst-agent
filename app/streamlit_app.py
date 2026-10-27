@@ -296,4 +296,4 @@ with tab_ai:
 
 # ============ TAB: CHAT (questions about the data summary) ============
 with tab_chat:
-    render_chat(profile, data_key=f"{table['name']}:{hashlib.sha1(data).hexdigest()[:12]}")
+    render_chat(profile, data_key=f"{table['name']}:{hashlib.sha1(data).hexdigest()[:12]}", df=df)
