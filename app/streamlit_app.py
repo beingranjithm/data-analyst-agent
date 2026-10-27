@@ -1,3 +1,4 @@
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -13,6 +14,7 @@ from tools.cleaner import clean_dataframe  # noqa: E402
 from tools.loader import load_csv_bytes  # noqa: E402
 from tools.profiler import describe_column, profile_dataframe, profile_to_text  # noqa: E402
 from tools.sandbox import run_code  # noqa: E402
+from ui.dashboard_tab import render_ai_dashboard  # noqa: E402
 
 st.set_page_config(page_title="Agentic Data Analyst", page_icon="📊", layout="wide")
 
@@ -57,7 +59,7 @@ def show_chart(df, spec, key):
 
 
 st.title("📊 Agentic Data Analyst")
-st.caption("Upload a CSV and get an instant overview. AI-made dashboards and chat come next.")
+st.caption("Upload a CSV and get an instant overview. The '✨ AI dashboard' tab plans and builds a dashboard with AI after you approve the plan. Chat comes next.")
 
 # ---- choose the data source ----
 source = st.sidebar.radio("Data source", ["Upload my own CSV", "Built-in sample sales data", "Messy test file"])
@@ -101,7 +103,8 @@ df, profile = table["df"], table["profile"]
 d = profile["dataset"]
 st.subheader(f"Table: {table['name']}")
 
-tab_overview, tab_gallery, tab_builder, tab_sandbox = st.tabs(["Overview", "Chart gallery", "Build a chart", "Code sandbox"])
+tab_overview, tab_ai, tab_gallery, tab_builder, tab_sandbox = st.tabs(
+    ["Overview", "✨ AI dashboard", "Chart gallery", "Build a chart", "Code sandbox"])
 
 # ============ TAB 1: OVERVIEW ============
 with tab_overview:
@@ -285,3 +288,7 @@ with tab_sandbox:
             st.write("Result:", res.value)
         if res.figure is not None:
             st.plotly_chart(res.figure, key="sandbox_fig")
+
+# ============ TAB 5: AI DASHBOARD (plan -> you approve -> build) ============
+with tab_ai:
+    render_ai_dashboard(df, profile, data_key=f"{table['name']}:{hashlib.sha1(data).hexdigest()[:12]}")
