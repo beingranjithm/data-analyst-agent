@@ -26,7 +26,7 @@ if MODE != "replay":
     if not (os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")):
         sys.exit("No API key found in hello_agent/.env (expected GOOGLE_API_KEY=...). Nothing was sent.")
 
-from agents.chat_agent import MAX_RESULT_ROWS, ChatSession
+from agents.chat_agent import MAX_CODE_RUNS, MAX_RESULT_ROWS, ChatSession
 from agents.llm_factory import make_llm
 from agents.resilience import quiet_adk_logs
 from tools.cleaner import clean_dataframe
@@ -39,7 +39,7 @@ df, _ = load_csv_bytes((ROOT / "sample_data" / "sales_sample.csv").read_bytes())
 df, _ = clean_dataframe(df)
 profile = profile_dataframe(df)
 model = make_llm("chat", mode=MODE)
-chat = ChatSession(profile, model, tables=df,
+chat = ChatSession(profile, model, tables=df, max_code_runs=MAX_CODE_RUNS,
                    on_wait=lambda n, seconds, why: print(f"  (server busy, waiting {seconds:.0f}s, try {n}: {why[:80]})", flush=True))
 
 _NUM = re.compile(r"(?<![\w.])-?\d[\d,]*(?:\.\d+)?")

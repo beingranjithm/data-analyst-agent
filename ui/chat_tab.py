@@ -22,10 +22,10 @@ CALC_NOTE = ("🧮 For questions that need numbers, the AI writes pandas code th
 
 def default_session_factory(profile, settings):
     """Builds the real chat models (cache + pacing + fallback chain) and a ChatSession."""
-    from agents.chat_agent import ChatSession
+    from agents.chat_agent import MAX_CODE_RUNS, ChatSession
     from agents.llm_factory import make_llm
     model = make_llm("chat", mode=settings["cache_mode"])
-    return ChatSession(profile, model, tables=settings.get("df"))
+    return ChatSession(profile, model, tables=settings.get("df"), max_code_runs=MAX_CODE_RUNS)
 
 
 def _clear_chat():
@@ -40,7 +40,7 @@ def _show_calculations(calcs):
     with st.expander(label):
         for n, c in enumerate(calcs, 1):
             if len(calcs) > 1:
-                st.caption(f"Calculation {n}" + ("" if c.ok else " (failed)"))
+                st.caption(f"Calculation {n}" + (" (failed)" if not c.ok else " (found nothing)" if c.empty else ""))
             st.code(c.code, language="python")
             st.text(("Result shown to the AI:\n" if c.ok else "Error:\n") + c.result_text)
 
