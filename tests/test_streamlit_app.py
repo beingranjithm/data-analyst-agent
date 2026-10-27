@@ -19,10 +19,11 @@ def open_sample():
     return at
 
 
-def test_the_app_still_runs_and_has_five_tabs_with_the_ai_tab_second():
+def test_the_app_still_runs_and_has_six_tabs_with_ai_dashboard_second_and_chat_third():
     at = open_sample()
     assert not at.exception
-    assert [t.label for t in at.tabs] == ["Overview", "✨ AI dashboard", "Chart gallery", "Build a chart", "Code sandbox"]
+    assert [t.label for t in at.tabs] == ["Overview", "✨ AI dashboard", "💬 Chat", "Chart gallery",
+                                          "Build a chart", "Code sandbox"]
 
 
 def test_plan_review_and_build_inside_the_real_app(monkeypatch):

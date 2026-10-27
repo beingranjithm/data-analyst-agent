@@ -14,6 +14,7 @@ from tools.cleaner import clean_dataframe  # noqa: E402
 from tools.loader import load_csv_bytes  # noqa: E402
 from tools.profiler import describe_column, profile_dataframe, profile_to_text  # noqa: E402
 from tools.sandbox import run_code  # noqa: E402
+from ui.chat_tab import render_chat  # noqa: E402
 from ui.dashboard_tab import render_ai_dashboard  # noqa: E402
 
 st.set_page_config(page_title="Agentic Data Analyst", page_icon="📊", layout="wide")
@@ -103,8 +104,8 @@ df, profile = table["df"], table["profile"]
 d = profile["dataset"]
 st.subheader(f"Table: {table['name']}")
 
-tab_overview, tab_ai, tab_gallery, tab_builder, tab_sandbox = st.tabs(
-    ["Overview", "✨ AI dashboard", "Chart gallery", "Build a chart", "Code sandbox"])
+tab_overview, tab_ai, tab_chat, tab_gallery, tab_builder, tab_sandbox = st.tabs(
+    ["Overview", "✨ AI dashboard", "💬 Chat", "Chart gallery", "Build a chart", "Code sandbox"])
 
 # ============ TAB 1: OVERVIEW ============
 with tab_overview:
@@ -292,3 +293,7 @@ with tab_sandbox:
 # ============ TAB 5: AI DASHBOARD (plan -> you approve -> build) ============
 with tab_ai:
     render_ai_dashboard(df, profile, data_key=f"{table['name']}:{hashlib.sha1(data).hexdigest()[:12]}")
+
+# ============ TAB: CHAT (questions about the data summary) ============
+with tab_chat:
+    render_chat(profile, data_key=f"{table['name']}:{hashlib.sha1(data).hexdigest()[:12]}")
