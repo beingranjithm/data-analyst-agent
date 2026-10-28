@@ -319,4 +319,12 @@ with tab_ai:
 
 # ============ TAB: CHAT (questions about the data summary) ============
 with tab_chat:
-    render_chat(profile, data_key=base_key + ("|" + filter_sig if filter_sig else ""), df=df, scope=filter_label)
+    multi = None
+    if len(all_tables) > 1:                                  # Day 22: several files -> the chat may combine them
+        from agents.multi_chat import build_multi_chat
+        active = st.session_state["active_table"]
+        multi = build_multi_chat(active, df, {n: t["df"] for n, t in all_tables.items()},
+                                 list(st.session_state.get("links_enabled", [])),
+                                 origin={active: table["name"]} if active != table["name"] else {})
+    render_chat(profile, data_key=base_key + ("|" + filter_sig if filter_sig else ""), df=df, scope=filter_label,
+                multi=multi)

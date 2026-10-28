@@ -448,9 +448,10 @@ def _pct(x) -> str:
     return "n/a" if x is None else f"{x * 100:.0f}%"
 
 
-def render_markdown(results: Sequence[Result], skipped: Sequence = (), meta: Optional[dict] = None) -> str:
+def render_markdown(results: Sequence[Result], skipped: Sequence = (), meta: Optional[dict] = None,
+                    title: str = "Chat accuracy evaluation") -> str:
     s, meta = summarize(results), meta or {}
-    lines = ["# Chat accuracy evaluation", ""]
+    lines = [f"# {title}", ""]
     if meta:
         lines += [" · ".join(f"{k}: {v}" for k, v in meta.items()), ""]
     lines += [f"**{s['passed']} of {s['answered']} answered questions fully correct ({_pct(s['strict'])})**"
@@ -503,7 +504,8 @@ def render_markdown(results: Sequence[Result], skipped: Sequence = (), meta: Opt
 
 
 # ------------------------------------------------------------------ saving the report
-def save_report(results: Sequence[Result], skipped: Sequence, meta: dict, folder) -> tuple:
+def save_report(results: Sequence[Result], skipped: Sequence, meta: dict, folder, *, name: str = "chat_eval",
+                title: str = "Chat accuracy evaluation") -> tuple:
     """Writes chat_eval.md and chat_eval.json into `folder`. A run that answered FEWER questions than the report
     already there (a quota-limited or replay-only run) is written as chat_eval_partial.* instead, so a complete
     report is never overwritten by a smaller one. Returns (markdown path, replaced_existing_report)."""
@@ -512,17 +514,17 @@ def save_report(results: Sequence[Result], skipped: Sequence, meta: dict, folder
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     answered = summarize(results)["answered"]
-    existing = folder / "chat_eval.json"
+    existing = folder / f"{name}.json"
     previous = -1
     if existing.exists():
         try:
             previous = int(json.loads(existing.read_text()).get("summary", {}).get("answered", -1))
         except (ValueError, OSError):
             previous = -1
-    stem = "chat_eval" if answered >= previous else "chat_eval_partial"
+    stem = name if answered >= previous else f"{name}_partial"
     md = folder / f"{stem}.md"
-    md.write_text(render_markdown(results, skipped, meta))
+    md.write_text(render_markdown(results, skipped, meta, title))
     data = dict(meta=meta, summary=summarize(results), results=[r.__dict__ for r in results],
                 skipped=[dict(id=n, question=t, reason=why) for n, t, why in skipped])
     (folder / f"{stem}.json").write_text(json.dumps(data, indent=2, default=str))
-    return md, stem == "chat_eval"
+    return md, stem == name

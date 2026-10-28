@@ -29,6 +29,7 @@ def render_multi(batch: list):
     links = memo(("links", sig), lambda: find_links(frames))
     enabled, focus = render_links_panel(frames, links, sig)
     key = f"{sig}|{focus}|{links_signature(enabled)}"
+    st.session_state["links_enabled"] = enabled                       # Day 22: the chat needs the same links
     with st.spinner(f"Preparing {focus} ..."):
         table, flat = memo(("flat", key), lambda: build_flat(frames, focus, enabled, profile_dataframe, raw_tables=tables))
     if flat.joined:

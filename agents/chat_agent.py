@@ -344,13 +344,14 @@ class ChatSession:
 
     def __init__(self, profile: dict, model, *, tables=None, runner=None, max_code_runs: int = 1,
                  max_turns: int = 8, delays=DEFAULT_DELAYS, sleep=asyncio.sleep, on_wait=None, scope: str = "",
-                 fix_numbers: bool = True):
+                 fix_numbers: bool = True, extra_note: str = ""):
         """`tables`: the data to calculate on (a DataFrame or a dict of them). Without it the chat answers from
         the profile only (Day 14). `runner(code, tables)` runs model-written code (default: the sandbox)."""
         self.profile = profile
         self.scope = scope
         self.fix_numbers = fix_numbers
-        self.profile_text = sanitize_profile_text(scope_note(scope) + profile_text_for_chat(profile))
+        self.profile_text = sanitize_profile_text(scope_note(scope) + profile_text_for_chat(profile)
+                                                  + ("\n\n" + extra_note if extra_note else ""))   # Day 22: several tables
         self.model = model
         self.tables = tables
         self.instruction = CALC_INSTRUCTION if tables is not None else INSTRUCTION

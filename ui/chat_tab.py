@@ -25,6 +25,10 @@ def default_session_factory(profile, settings):
     from agents.chat_agent import MAX_CODE_RUNS, ChatSession
     from agents.llm_factory import make_llm
     model = make_llm("chat", mode=settings["cache_mode"])
+    multi = settings.get("multi")                     # Day 22: {"tables", "note", "runner"} when several files were uploaded
+    if multi:
+        return ChatSession(profile, model, tables=multi["tables"], max_code_runs=MAX_CODE_RUNS,
+                           scope=settings.get("scope", ""), extra_note=multi["note"], runner=multi["runner"])
     return ChatSession(profile, model, tables=settings.get("df"), max_code_runs=MAX_CODE_RUNS,
                        scope=settings.get("scope", ""))
 
@@ -75,7 +79,8 @@ def _starters(profile, can_calculate):
     return qs
 
 
-def render_chat(profile, data_key: str, *, df=None, session_factory: Optional[Callable] = None, scope: str = ""):
+def render_chat(profile, data_key: str, *, df=None, session_factory: Optional[Callable] = None, scope: str = "",
+                multi=None):
     """Draws the tab. `data_key` identifies the dataset: a new key starts a new conversation.
     `df` is the data the AI may calculate on (None = answer from the summary only).
     `session_factory(profile, settings)` can replace the real models (tests do); settings holds the data as "df"."""
@@ -97,6 +102,9 @@ def render_chat(profile, data_key: str, *, df=None, session_factory: Optional[Ca
         st.error("No Gemini API key found. Put GOOGLE_API_KEY=... in hello_agent/.env, or choose 'Replay only'.")
         blocked = True
     st.caption(CALC_NOTE if df is not None else LIMIT_NOTE)
+    if multi:
+        st.caption(f"🔗 The chat works on '{next(iter(multi['tables']))}' and can also use your other uploaded tables, "
+                   "with the links found between them. Open \"Show the calculation\" to see what it used.")
     if scope:
         st.info(f"🔎 Answering only for the filtered rows: {scope}. Changing the filter starts a new conversation.")
 
@@ -111,7 +119,8 @@ def render_chat(profile, data_key: str, *, df=None, session_factory: Optional[Ca
 
     if session is None and not blocked:
         try:
-            session = (session_factory or default_session_factory)(profile, {"cache_mode": mode, "df": df, "scope": scope})
+            session = (session_factory or default_session_factory)(profile, {"cache_mode": mode, "df": df, "scope": scope,
+                                                                                     "multi": multi})
         except Exception as e:
             st.error(f"Could not start the chat: {type(e).__name__}: {e}")
             return
