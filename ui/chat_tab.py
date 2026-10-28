@@ -19,6 +19,9 @@ LIMIT_NOTE = ("ℹ️ I answer from a summary of the data (column types, ranges,
 CALC_NOTE = ("🧮 For questions that need numbers, the AI writes pandas code that runs in a locked-down sandbox on "
              "your computer. The AI sees only a small result (at most 20 rows), never the whole table. "
              "Open \"Show the calculation\" under an answer to check the code and the result.")
+REPLAY_NOTE = ("🧮 These are saved answers. Each one shows the calculation behind it (\"Show the calculation\"), "
+               "and it runs again here on the demo data. New questions need your own Gemini key, and on this host "
+               "they are answered from the data summary only.")
 
 
 def default_session_factory(profile, settings):
@@ -82,9 +85,11 @@ def _starters(profile, can_calculate):
 
 
 def render_chat(profile, data_key: str, *, df=None, session_factory: Optional[Callable] = None, scope: str = "",
-                multi=None, starters=None):
+                multi=None, starters=None, calc_live: bool = True):
     """Draws the tab. `data_key` identifies the dataset: a new key starts a new conversation.
     `df` is the data the AI may calculate on (None = answer from the summary only).
+    `calc_live=False` (a host without the sandbox's file-system lock): only saved ('Replay only') answers may run
+    their calculations; a live AI answers from the summary only.
     `session_factory(profile, settings)` can replace the real models (tests do); settings holds the data as "df"."""
     ss = st.session_state
     if ss.get("chat_data_key") != data_key:
@@ -105,7 +110,9 @@ def render_chat(profile, data_key: str, *, df=None, session_factory: Optional[Ca
         st.error("Paste your own Gemini key in the sidebar, or choose 'Replay only'." if is_hosted() else
                  "No Gemini API key found. Put GOOGLE_API_KEY=... in hello_agent/.env, or choose 'Replay only'.")
         blocked = True
-    st.caption(CALC_NOTE if df is not None else LIMIT_NOTE)
+    if not calc_live and mode != "replay":          # Day 23c: no file-system lock -> no live calculations
+        df, multi, starters = None, None, None
+    st.caption(LIMIT_NOTE if df is None else CALC_NOTE if calc_live else REPLAY_NOTE)
     if multi:
         st.caption(f"🔗 The chat works on '{next(iter(multi['tables']))}' and can also use your other uploaded tables, "
                    "with the links found between them. Open \"Show the calculation\" to see what it used.")

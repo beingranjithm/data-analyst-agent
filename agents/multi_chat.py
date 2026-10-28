@@ -176,7 +176,7 @@ def make_multi_runner(tables: dict, links: list, active: str, *, inner=None, ori
             from agents.chat_agent import CALC_TIMEOUT
             from tools.sandbox import run_code
             from tools.hosting import sandbox_options
-            return run_code(code, tbls, active=active, timeout=CALC_TIMEOUT, **sandbox_options())
+            return run_code(code, tbls, active=active, timeout=CALC_TIMEOUT, **sandbox_options(code))
 
     def runner(code, tbls):
         reason = check_combination(code, active, origin, events) or check_number_as_text(code, tbls)

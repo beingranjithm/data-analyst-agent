@@ -116,6 +116,13 @@ def _idle(df, profile, session_factory):
     max_charts = c3.number_input("Maximum charts", 1, 10, int(ss.get("ai_saved_max", 6)), key="ai_max_charts")
     ss["ai_saved_use_ai"], ss["ai_saved_mode"], ss["ai_saved_max"] = use_ai, mode_label, int(max_charts)
     mode = cache_modes()[mode_label]
+    from tools import hosting                                  # Day 23c: looked up here so a test can replace it
+    no_lock = hosting.is_hosted() and use_ai and mode != "replay" and not hosting.isolation_ok()[0]
+    if no_lock:                                                # AI chart code cannot run here: do not waste the visitor's requests
+        st.info("The AI's chart code cannot run on this host (the sandbox's file-system lock is not available), so a "
+                "live AI run is switched off here and the dashboard is made by fixed rules. 'Replay only' shows the "
+                "saved demo dashboard.")
+        use_ai = False
     needs_key = use_ai and mode != "replay"
     if needs_key:
         st.caption(PRIVACY_NOTE)

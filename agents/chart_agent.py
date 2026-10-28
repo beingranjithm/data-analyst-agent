@@ -119,7 +119,7 @@ async def make_chart_async(df: pd.DataFrame, profile: dict, chart: ChartSpec,
         return ChartResult(False, "The model's reply contained no code block.", None, None, raw)
 
     from tools.hosting import sandbox_options
-    run = run_code(code, df, **sandbox_options())          # the sandbox does the static safety check itself
+    run = run_code(code, df, **sandbox_options(code))          # the sandbox does the static safety check itself
     if not run.ok:
         return ChartResult(False, run.message(), code, run, raw)
     if run.figure is None:

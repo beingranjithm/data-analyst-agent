@@ -178,10 +178,20 @@ def test_the_hosted_app_opens_on_the_demo_without_the_messy_file(monkeypatch):
     assert chat_modes.value.startswith("Replay only")                        # no key needed to start
 
 
-def test_without_the_sandbox_lock_the_demo_questions_are_not_offered(monkeypatch):
-    at = app(monkeypatch, probe=(False, "no lock"), hosted=True).run()
-    assert not at.exception and not set(starter_buttons(at)) & set(DEMO_QUESTIONS)      # replayed code would be shown as text
-    assert starter_buttons(at)                                                          # the ordinary starters remain
+def test_without_the_sandbox_lock_the_demo_questions_still_work_in_replay_mode(monkeypatch):
+    at = app(monkeypatch, probe=(False, "no lock"), hosted=True).run()           # Day 23c: recorded code may run
+    assert not at.exception and starter_buttons(at) == DEMO_QUESTIONS
+    assert any("Live calculations are switched off" in w.value for w in at.warning)
+
+
+def test_without_the_sandbox_lock_a_live_ai_gets_no_demo_questions_and_no_data(monkeypatch):
+    at = app(monkeypatch, probe=(False, "no lock"), hosted=True)
+    at.session_state["user_api_key"] = "a-visitor-key-123"
+    at.run()
+    next(s for s in at.selectbox if s.key == "chat_cache_mode").set_value("Ask the AI again: ignore saved replies").run()
+    assert not at.exception
+    assert not set(starter_buttons(at)) & set(DEMO_QUESTIONS) and starter_buttons(at)
+    assert any("I answer from a summary of the data" in c.value for c in at.caption)
 
 
 def test_other_data_gets_the_usual_starters_not_the_demo_ones(monkeypatch):

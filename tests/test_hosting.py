@@ -118,9 +118,9 @@ def test_ai_chart_code_passes_the_hosting_options(monkeypatch, on):
     spy = Spy()
     monkeypatch.setattr(ca, "run_code", spy)
     src = open(ROOT / "agents" / "chart_agent.py").read()
-    assert "sandbox_options()" in src and "run_code(code, df, **sandbox_options())" in src
+    assert "run_code(code, df, **sandbox_options(code))" in src
     from tools.hosting import sandbox_options
-    ca.run_code("x", pd.DataFrame(), **sandbox_options())
+    ca.run_code("x", pd.DataFrame(), **sandbox_options("x"))
     assert ("require_isolation" in spy.calls[0]) is on
 
 
@@ -293,13 +293,18 @@ def test_a_file_over_the_hosted_limit_is_refused(hosted, monkeypatch):
 SMALL = [("t.csv", b"region,revenue\nN,10\nS,20\nE,30\nW,40\nN,50\nS,60\n")]
 
 
-def test_when_the_sandbox_lock_is_missing_the_chat_does_not_calculate(hosted, monkeypatch):
+def test_when_the_sandbox_lock_is_missing_only_saved_answers_calculate(hosted, monkeypatch):
     at = open_app(monkeypatch, SMALL, probe=(False, "the sandbox's file-system lock is not available on this host")).run()
     assert not at.exception
     t = texts(at)
-    assert any("Calculations are switched off on this host" in x for x in t)
-    assert any("I answer from a summary of the data" in x for x in t)
+    assert any("Live calculations are switched off on this host" in x for x in t)      # Replay only is the default
+    assert any("These are saved answers" in x for x in t)
     assert not any("locked-down sandbox on your computer" in x for x in t)
+    at.session_state["user_api_key"] = "a-visitor-key-123"
+    next(s for s in at.selectbox if s.key == "chat_cache_mode").set_value("Ask the AI again: ignore saved replies").run()
+    t = texts(at)
+    assert any("I answer from a summary of the data" in x for x in t)                   # a live AI gets no data to calculate on
+    assert not any("These are saved answers" in x for x in t)
 
 
 def test_when_the_sandbox_lock_works_the_chat_calculates(hosted, monkeypatch):
@@ -333,9 +338,12 @@ TWO = [("races.csv", b"raceId,year\n1,2020\n2,2021\n3,2022\n"),
        ("results.csv", b"resultId,raceId,points\n1,1,10\n2,1,8\n3,2,10\n4,2,6\n5,3,10\n6,3,4\n")]
 
 
-def test_several_tables_and_no_sandbox_lock_means_no_multi_table_chat(hosted, monkeypatch):
+def test_several_tables_and_no_sandbox_lock_means_no_live_multi_table_chat(hosted, monkeypatch):
     at = open_app(monkeypatch, TWO, probe=(False, "x")).run()
     assert not at.exception
+    assert any("The chat works on" in t for t in texts(at))                             # saved answers may still use them
+    at.session_state["user_api_key"] = "a-visitor-key-123"
+    next(s for s in at.selectbox if s.key == "chat_cache_mode").set_value("Ask the AI again: ignore saved replies").run()
     assert not any("The chat works on" in t for t in texts(at))
     at = open_app(monkeypatch, TWO, probe=(True, "")).run()
     assert any("The chat works on" in t for t in texts(at))

@@ -345,12 +345,14 @@ with tab_chat:
                                  list(st.session_state.get("links_enabled", [])),
                                  origin={active: table["name"]} if active != table["name"] else {})
     chat_df = df
+    calc_live = True
     if is_hosted():                                          # Day 23a: AI code runs here only if the file-system lock works
         _ok, _why = isolation_ok()
-        if not _ok:
-            st.warning(f"Calculations are switched off on this host ({_why}). The chat answers from the data summary only.")
-            chat_df, multi = None, None
+        if not _ok:                                          # Day 23c: saved demo calculations still run; new ones do not
+            calc_live = False
+            st.warning(f"Live calculations are switched off on this host ({_why}). The saved demo answers still work "
+                       "with 'Replay only'. With your own key the chat answers from the data summary only.")
     from evals.f1_eval import DEMO_QUESTIONS
     demo_starters = DEMO_QUESTIONS if (source == DEMO_LABEL and chat_df is not None and not filter_label) else None
     render_chat(profile, data_key=base_key + ("|" + filter_sig if filter_sig else ""), df=chat_df, scope=filter_label,
-                multi=multi, starters=demo_starters)
+                multi=multi, starters=demo_starters, calc_live=calc_live)
