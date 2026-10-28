@@ -1,0 +1,45 @@
+raceId,year,round,circuitId,name,date,time,url,fp1_date,fp1_time,fp2_date,fp2_time,fp3_date,fp3_time,quali_date,quali_time,sprint_date,sprint_time
+1053,2021,2,21,Emilia Romagna Grand Prix,2021-04-18,13:00:00,http://en.wikipedia.org/wiki/2021_Emilia_Romagna_Grand_Prix,2021-04-16,\N,2021-04-16,\N,2021-04-17,\N,2021-04-17,\N,\N,\N
+1074,2022,1,3,Bahrain Grand Prix,2022-03-20,15:00:00,http://en.wikipedia.org/wiki/2022_Bahrain_Grand_Prix,2022-03-18,12:00:00,2022-03-18,15:00:00,2022-03-19,12:00:00,2022-03-19,15:00:00,\N,\N
+1052,2021,1,3,Bahrain Grand Prix,2021-03-28,15:00:00,http://en.wikipedia.org/wiki/2021_Bahrain_Grand_Prix,2021-03-26,\N,2021-03-26,\N,2021-03-27,\N,2021-03-27,\N,\N,\N
+1051,2021,20,78,Qatar Grand Prix,2021-11-21,14:00:00,http://en.wikipedia.org/wiki/2021_Qatar_Grand_Prix,2021-11-19,\N,2021-11-19,\N,2021-11-20,\N,2021-11-20,\N,\N,\N
+1054,2021,3,75,Portuguese Grand Prix,2021-05-02,14:00:00,http://en.wikipedia.org/wiki/2021_Portuguese_Grand_Prix,2021-04-30,\N,2021-04-30,\N,2021-05-01,\N,2021-05-01,\N,\N,\N
+1055,2021,4,4,Spanish Grand Prix,2021-05-09,13:00:00,http://en.wikipedia.org/wiki/2021_Spanish_Grand_Prix,2021-05-07,\N,2021-05-07,\N,2021-05-08,\N,2021-05-08,\N,\N,\N
+1056,2021,5,6,Monaco Grand Prix,2021-05-23,13:00:00,http://en.wikipedia.org/wiki/2021_Monaco_Grand_Prix,2021-05-21,\N,2021-05-21,\N,2021-05-22,\N,2021-05-22,\N,\N,\N
+1057,2021,6,73,Azerbaijan Grand Prix,2021-06-06,12:00:00,http://en.wikipedia.org/wiki/2021_Azerbaijan_Grand_Prix,2021-06-04,\N,2021-06-04,\N,2021-06-05,\N,2021-06-05,\N,\N,\N
+1058,2021,8,70,Styrian Grand Prix,2021-06-27,13:00:00,http://en.wikipedia.org/wiki/2021_Styrian_Grand_Prix,2021-06-25,\N,2021-06-25,\N,2021-06-26,\N,2021-06-26,\N,\N,\N
+1059,2021,7,34,French Grand Prix,2021-06-20,13:00:00,http://en.wikipedia.org/wiki/2021_French_Grand_Prix,2021-06-18,\N,2021-06-18,\N,2021-06-19,\N,2021-06-19,\N,\N,\N
+1060,2021,9,70,Austrian Grand Prix,2021-07-04,13:00:00,http://en.wikipedia.org/wiki/2021_Austrian_Grand_Prix,2021-07-02,\N,2021-07-02,\N,2021-07-03,\N,2021-07-03,\N,\N,\N
+1061,2021,10,9,British Grand Prix,2021-07-18,14:00:00,http://en.wikipedia.org/wiki/2021_British_Grand_Prix,2021-07-16,\N,2021-07-17,\N,\N,\N,2021-07-16,\N,2021-07-17,\N
+1062,2021,11,11,Hungarian Grand Prix,2021-08-01,13:00:00,http://en.wikipedia.org/wiki/2021_Hungarian_Grand_Prix,2021-07-30,\N,2021-07-30,\N,2021-07-31,\N,2021-07-31,\N,\N,\N
+1063,2021,12,13,Belgian Grand Prix,2021-08-29,13:00:00,http://en.wikipedia.org/wiki/2021_Belgian_Grand_Prix,2021-08-27,\N,2021-08-27,\N,2021-08-28,\N,2021-08-28,\N,\N,\N
+1064,2021,13,39,Dutch Grand Prix,2021-09-05,13:00:00,http://en.wikipedia.org/wiki/2021_Dutch_Grand_Prix,2021-09-03,\N,2021-09-03,\N,2021-09-04,\N,2021-09-04,\N,\N,\N
+1065,2021,14,14,Italian Grand Prix,2021-09-12,13:00:00,http://en.wikipedia.org/wiki/2021_Italian_Grand_Prix,2021-09-10,\N,2021-09-11,\N,\N,\N,2021-09-10,\N,2021-09-11,\N
+1066,2021,15,71,Russian Grand Prix,2021-09-26,12:00:00,http://en.wikipedia.org/wiki/2021_Russian_Grand_Prix,2021-09-24,\N,2021-09-24,\N,2021-09-25,\N,2021-09-25,\N,\N,\N
+1067,2021,16,5,Turkish Grand Prix,2021-10-10,12:00:00,http://en.wikipedia.org/wiki/2021_Turkish_Grand_Prix,2021-10-08,\N,2021-10-08,\N,2021-10-09,\N,2021-10-09,\N,\N,\N
+1069,2021,17,69,United States Grand Prix,2021-10-24,19:00:00,http://en.wikipedia.org/wiki/2021_United_States_Grand_Prix,2021-10-22,\N,2021-10-22,\N,2021-10-23,\N,2021-10-23,\N,\N,\N
+1070,2021,18,32,Mexico City Grand Prix,2021-11-07,19:00:00,http://en.wikipedia.org/wiki/2021_Mexican_Grand_Prix,2021-11-05,\N,2021-11-05,\N,2021-11-06,\N,2021-11-06,\N,\N,\N
+1071,2021,19,18,São Paulo Grand Prix,2021-11-14,17:00:00,http://en.wikipedia.org/wiki/2021_S%C3%A3o_Paulo_Grand_Prix,2021-11-12,\N,2021-11-13,\N,\N,\N,2021-11-12,\N,2021-11-13,\N
+1072,2021,21,77,Saudi Arabian Grand Prix,2021-12-05,17:30:00,http://en.wikipedia.org/wiki/2021_Saudi_Arabian_Grand_Prix,2021-12-03,\N,2021-12-03,\N,2021-12-04,\N,2021-12-04,\N,\N,\N
+1073,2021,22,24,Abu Dhabi Grand Prix,2021-12-12,13:00:00,http://en.wikipedia.org/wiki/2021_Abu_Dhabi_Grand_Prix,2021-12-10,\N,2021-12-10,\N,2021-12-11,\N,2021-12-11,\N,\N,\N
+1075,2022,2,77,Saudi Arabian Grand Prix,2022-03-27,17:00:00,http://en.wikipedia.org/wiki/2022_Saudi_Arabian_Grand_Prix,2022-03-25,14:00:00,2022-03-25,17:00:00,2022-03-26,14:00:00,2022-03-26,17:00:00,\N,\N
+1076,2022,3,1,Australian Grand Prix,2022-04-10,05:00:00,http://en.wikipedia.org/wiki/2022_Australian_Grand_Prix,2022-04-08,03:00:00,2022-04-08,06:00:00,2022-04-09,03:00:00,2022-04-09,06:00:00,\N,\N
+1077,2022,4,21,Emilia Romagna Grand Prix,2022-04-24,13:00:00,http://en.wikipedia.org/wiki/2022_Emilia_Romagna_Grand_Prix,2022-04-22,11:30:00,2022-04-23,10:30:00,\N,\N,2022-04-22,15:00:00,2022-04-23,14:30:00
+1078,2022,5,79,Miami Grand Prix,2022-05-08,19:30:00,http://en.wikipedia.org/wiki/2022_Miami_Grand_Prix,2022-05-06,18:30:00,2022-05-06,21:30:00,2022-05-07,17:00:00,2022-05-07,20:00:00,\N,\N
+1079,2022,6,4,Spanish Grand Prix,2022-05-22,13:00:00,http://en.wikipedia.org/wiki/2022_Spanish_Grand_Prix,2022-05-20,12:00:00,2022-05-20,15:00:00,2022-05-21,11:00:00,2022-05-21,14:00:00,\N,\N
+1080,2022,7,6,Monaco Grand Prix,2022-05-29,13:00:00,http://en.wikipedia.org/wiki/2022_Monaco_Grand_Prix,2022-05-27,12:00:00,2022-05-27,15:00:00,2022-05-28,11:00:00,2022-05-28,14:00:00,\N,\N
+1081,2022,8,73,Azerbaijan Grand Prix,2022-06-12,11:00:00,http://en.wikipedia.org/wiki/2022_Azerbaijan_Grand_Prix,2022-06-10,11:00:00,2022-06-10,14:00:00,2022-06-11,11:00:00,2022-06-11,14:00:00,\N,\N
+1082,2022,9,7,Canadian Grand Prix,2022-06-19,18:00:00,http://en.wikipedia.org/wiki/2022_Canadian_Grand_Prix,2022-06-17,18:00:00,2022-06-17,21:00:00,2022-06-18,17:00:00,2022-06-18,20:00:00,\N,\N
+1083,2022,10,9,British Grand Prix,2022-07-03,14:00:00,http://en.wikipedia.org/wiki/2022_British_Grand_Prix,2022-07-01,12:00:00,2022-07-01,15:00:00,2022-07-02,11:00:00,2022-07-02,14:00:00,\N,\N
+1084,2022,11,70,Austrian Grand Prix,2022-07-10,13:00:00,http://en.wikipedia.org/wiki/2022_Austrian_Grand_Prix,2022-07-08,11:30:00,2022-07-09,10:30:00,\N,\N,2022-07-08,15:00:00,2022-07-09,14:30:00
+1085,2022,12,34,French Grand Prix,2022-07-24,13:00:00,http://en.wikipedia.org/wiki/2022_French_Grand_Prix,2022-07-22,12:00:00,2022-07-22,15:00:00,2022-07-23,11:00:00,2022-07-23,14:00:00,\N,\N
+1086,2022,13,11,Hungarian Grand Prix,2022-07-31,13:00:00,http://en.wikipedia.org/wiki/2022_Hungarian_Grand_Prix,2022-07-29,12:00:00,2022-07-29,15:00:00,2022-07-30,11:00:00,2022-07-30,14:00:00,\N,\N
+1087,2022,14,13,Belgian Grand Prix,2022-08-28,13:00:00,http://en.wikipedia.org/wiki/2022_Belgian_Grand_Prix,2022-08-26,12:00:00,2022-08-26,15:00:00,2022-08-27,11:00:00,2022-08-27,14:00:00,\N,\N
+1088,2022,15,39,Dutch Grand Prix,2022-09-04,13:00:00,http://en.wikipedia.org/wiki/2022_Dutch_Grand_Prix,2022-09-02,10:30:00,2022-09-02,14:00:00,2022-09-03,10:00:00,2022-09-03,13:00:00,\N,\N
+1089,2022,16,14,Italian Grand Prix,2022-09-11,13:00:00,http://en.wikipedia.org/wiki/2022_Italian_Grand_Prix,2022-09-09,12:00:00,2022-09-09,15:00:00,2022-09-10,11:00:00,2022-09-10,14:00:00,\N,\N
+1091,2022,17,15,Singapore Grand Prix,2022-10-02,12:00:00,http://en.wikipedia.org/wiki/2022_Singapore_Grand_Prix,2022-09-30,10:00:00,2022-09-30,13:00:00,2022-10-01,10:00:00,2022-10-01,13:00:00,\N,\N
+1092,2022,18,22,Japanese Grand Prix,2022-10-09,05:00:00,http://en.wikipedia.org/wiki/2022_Japanese_Grand_Prix,2022-10-07,03:00:00,2022-10-07,06:00:00,2022-10-08,03:00:00,2022-10-08,06:00:00,\N,\N
+1093,2022,19,69,United States Grand Prix,2022-10-23,19:00:00,http://en.wikipedia.org/wiki/2022_United_States_Grand_Prix,2022-10-21,19:00:00,2022-10-21,22:00:00,2022-10-22,19:00:00,2022-10-22,22:00:00,\N,\N
+1094,2022,20,32,Mexico City Grand Prix,2022-10-30,20:00:00,http://en.wikipedia.org/wiki/2022_Mexican_Grand_Prix,2022-10-28,18:00:00,2022-10-28,21:00:00,2022-10-29,17:00:00,2022-10-29,20:00:00,\N,\N
+1095,2022,21,18,São Paulo Grand Prix,2022-11-13,18:00:00,http://en.wikipedia.org/wiki/2022_Brazilian_Grand_Prix,2022-11-11,15:30:00,2022-11-12,15:30:00,\N,\N,2022-11-11,19:00:00,2022-11-12,19:30:00
+1096,2022,22,24,Abu Dhabi Grand Prix,2022-11-20,13:00:00,http://en.wikipedia.org/wiki/2022_Abu_Dhabi_Grand_Prix,2022-11-18,10:00:00,2022-11-18,13:00:00,2022-11-19,11:00:00,2022-11-19,14:00:00,\N,\N

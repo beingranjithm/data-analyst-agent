@@ -5,6 +5,7 @@ gemini-3.5-flash-lite 15 requests/min and 500/day. Edit ROLE_MODELS if your tabl
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Optional
 
 from agents.llm_cache import DEFAULT_CACHE_PATH, CachingLlm
@@ -21,9 +22,24 @@ MIN_INTERVAL = {"gemini-3.6-flash": 12.5, "gemini-3.5-flash-lite": 4.5, "gemini-
 DEFAULT_INTERVAL = 12.5
 
 
-def make_llm(role: str = "chart", *, mode: Optional[str] = None, path=None, models: Optional[list] = None):
+DEMO_CACHE_PATH = Path(__file__).resolve().parent.parent / "deploy" / "demo_cache.json"
+
+
+def default_cache_path(mode: Optional[str]) -> Path:
+    """Where saved replies live. Normally .cache/llm_cache.json. To RECORD the public demo's answers, start the app or
+    the script with DAA_CACHE_PATH=deploy/demo_cache.json. On the public host, 'Replay only' reads the shipped demo file."""
+    env = os.getenv("DAA_CACHE_PATH")
+    if env:
+        return Path(env).expanduser()
+    from tools.hosting import is_hosted
+    return DEMO_CACHE_PATH if (is_hosted() and mode == "replay") else Path(DEFAULT_CACHE_PATH)
+
+
+def make_llm(role: str = "chart", *, mode: Optional[str] = None, path=None, models: Optional[list] = None,
+             api_key: Optional[str] = None):
     """The model object to pass to the agents. mode: "use" (default), "replay" or "off"
-    (or set the environment variable LLM_CACHE_MODE)."""
+    (or set the environment variable LLM_CACHE_MODE).
+    api_key: a visitor's own key (hosted version). It goes only into this model object, never into the environment."""
     if models is None:
         if role not in ROLE_MODELS:
             raise ValueError(f"unknown role {role!r}; choose one of {sorted(ROLE_MODELS)}")
@@ -34,7 +50,7 @@ def make_llm(role: str = "chart", *, mode: Optional[str] = None, path=None, mode
         inner = None
         if mode != "replay":
             from google.adk.models import Gemini
-            inner = Gemini(model=name)
-        chain.append(CachingLlm(model=name, inner=inner, mode=mode, path=str(path or DEFAULT_CACHE_PATH),
+            inner = Gemini(model=name, client_kwargs={"api_key": api_key}) if api_key else Gemini(model=name)
+        chain.append(CachingLlm(model=name, inner=inner, mode=mode, path=str(path or default_cache_path(mode)),
                                 min_interval=MIN_INTERVAL.get(name, DEFAULT_INTERVAL)))
     return chain[0] if len(chain) == 1 else FallbackLlm(chain=chain)

@@ -1,0 +1,3 @@
+# Day 23a: the server itself refuses files bigger than this (the app also checks, with a friendlier message)
+[server]
+maxUploadSize = 50

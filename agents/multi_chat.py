@@ -175,7 +175,8 @@ def make_multi_runner(tables: dict, links: list, active: str, *, inner=None, ori
         def inner(code, tbls):
             from agents.chat_agent import CALC_TIMEOUT
             from tools.sandbox import run_code
-            return run_code(code, tbls, active=active, timeout=CALC_TIMEOUT)
+            from tools.hosting import sandbox_options
+            return run_code(code, tbls, active=active, timeout=CALC_TIMEOUT, **sandbox_options())
 
     def runner(code, tbls):
         reason = check_combination(code, active, origin, events) or check_number_as_text(code, tbls)
@@ -191,3 +192,32 @@ def build_multi_chat(active: str, active_df, frames: dict, links: list, *, origi
     tables = {active: active_df, **{n: f for n, f in frames.items() if n != active}}
     return {"tables": tables, "note": multi_note(tables, links, active),
             "runner": make_multi_runner(tables, links, active, origin=origin)}
+
+
+def chat_session_for(prep: dict, model, **kw):
+    """A ChatSession set up exactly as the app sets one up for several tables (see ui/chat_tab.py)."""
+    from agents.chat_agent import MAX_CODE_RUNS, ChatSession
+    multi = prep["multi"]
+    return ChatSession(prep["table"]["profile"], model, tables=multi["tables"], runner=multi["runner"],
+                       extra_note=multi["note"], max_code_runs=MAX_CODE_RUNS, **kw)
+
+
+def prepare_chat(files, focus: str = "") -> dict:
+    """The same chat set-up the app builds for several uploaded files, for scripts (the F1 evaluation, recording the
+    public demo's answers). files = [(filename, bytes)]. Returns {"table", "multi", "frames", "links", "focus", "errors"}.
+    Uses the app's own functions, so a request made here is identical to the one the app makes (which is what lets
+    saved replies recorded by a script be replayed in the app)."""
+    from tools.multi import build_flat, build_table, choose_focus, load_tables
+    from tools.profiler import profile_dataframe
+    from tools.relations import find_links
+    tables, errors = load_tables(files, build_table)
+    frames = {n: t["df"] for n, t in tables.items()}
+    links = [l for l in find_links(frames) if l.kind == "many-to-one"]
+    focus = focus or choose_focus(frames, links)
+    if focus not in frames:
+        raise KeyError(f"No table called {focus!r}. Tables: {', '.join(frames)}")
+    table, flat = build_flat(frames, focus, links, profile_dataframe, raw_tables=tables)
+    active = f"{focus}_flat" if flat.joined else focus
+    multi = build_multi_chat(active, table["df"], frames, links, origin={active: focus} if active != focus else {})
+    return {"table": table, "multi": multi, "frames": frames, "links": links, "focus": focus, "active": active,
+            "flat": flat, "errors": errors}

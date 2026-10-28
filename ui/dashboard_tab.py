@@ -46,7 +46,23 @@ def usage_of(llm) -> tuple[int, int]:
     return (sum(getattr(m, "real_calls", 0) for m in members), sum(getattr(m, "hits", 0) for m in members))
 
 
+def _safe(text) -> str:
+    from ui.hosted_ui import safe_text
+    return safe_text(text)
+
+
+def cache_modes() -> dict:
+    """The reply settings the visitor may choose. On the public host the disk cache ("use") is off: it would keep
+    visitors' questions and data summaries on the server."""
+    from tools.hosting import is_hosted
+    return {k: v for k, v in CACHE_MODES.items() if v != "use"} if is_hosted() else dict(CACHE_MODES)
+
+
 def api_key_available() -> bool:
+    from tools.hosting import is_hosted
+    if is_hosted():                                   # public host: only the visitor's own key counts, never the server's
+        from ui.hosted_ui import user_key
+        return bool(user_key())
     try:
         from dotenv import load_dotenv
         load_dotenv(ROOT / "hello_agent" / ".env")
@@ -59,9 +75,11 @@ def default_session_factory(df, profile, settings, progress):
     """Builds the real models (planner / chart chains with cache and pacing) and an ApprovalSession."""
     from agents.approval_workflow import ApprovalSession
     from agents.llm_factory import make_llm
+    from ui.hosted_ui import user_key
     use_ai, mode = settings["use_ai"], settings["cache_mode"]
-    planner_llm = make_llm("planner", mode=mode) if use_ai else None
-    chart_llm = make_llm("chart", mode=mode) if use_ai else None
+    key = user_key() or None                          # the visitor's own key (public host); None = normal local setup
+    planner_llm = make_llm("planner", mode=mode, api_key=key) if use_ai else None
+    chart_llm = make_llm("chart", mode=mode, api_key=key) if use_ai else None
     session = ApprovalSession(df, profile, use_ai=use_ai, max_charts=settings["max_charts"], progress=progress,
                               planner_model=planner_llm, chart_model=chart_llm)
     session.models = (planner_llm, chart_llm)
@@ -90,20 +108,22 @@ def _idle(df, profile, session_factory):
     st.markdown("The AI **proposes** a dashboard. You **approve it** (drop any chart you do not want) "
                 "before anything is built.")
     c1, c2, c3 = st.columns([1, 3, 1])
-    labels = list(CACHE_MODES)
+    labels = list(cache_modes())
     use_ai = c1.checkbox("Use AI", value=ss.get("ai_saved_use_ai", True), key="ai_use_ai",
                          help="Off = a dashboard made by fixed rules, with no AI and no requests.")
     mode_label = c2.selectbox("AI replies", labels, index=labels.index(ss.get("ai_saved_mode", labels[0])),
                               key="ai_cache_mode", disabled=not use_ai)
     max_charts = c3.number_input("Maximum charts", 1, 10, int(ss.get("ai_saved_max", 6)), key="ai_max_charts")
     ss["ai_saved_use_ai"], ss["ai_saved_mode"], ss["ai_saved_max"] = use_ai, mode_label, int(max_charts)
-    mode = CACHE_MODES[mode_label]
+    mode = cache_modes()[mode_label]
     needs_key = use_ai and mode != "replay"
     if needs_key:
         st.caption(PRIVACY_NOTE)
     blocked = False
     if session_factory is None and needs_key and not api_key_available():
-        st.error("No Gemini API key found. Put GOOGLE_API_KEY=... in hello_agent/.env, "
+        from tools.hosting import is_hosted
+        st.error("Paste your own Gemini key in the sidebar, or choose 'Replay only' or untick 'Use AI'." if is_hosted() else
+                 "No Gemini API key found. Put GOOGLE_API_KEY=... in hello_agent/.env, "
                  "or choose 'Replay only' or untick 'Use AI'.")
         blocked = True
 
@@ -186,7 +206,7 @@ def _review():
                     sink["fn"] = None
                 status.update(label="Dashboard ready", state="complete")
         except ValueError as e:                      # a decision that does not fit: show it, keep waiting
-            st.error(str(e))
+            st.error(_safe(str(e)))
             return
         except Exception as e:
             error = f"Could not build the dashboard: {type(e).__name__}: {e}"
@@ -230,7 +250,7 @@ def _done():
                 if c.code:
                     st.code(c.code, language="python")
     for c in d.failed_charts:
-        st.warning(f"Skipped chart '{c.spec.title}': {c.message[:300]}")
+        st.warning(f"Skipped chart '{c.spec.title}': {_safe(c.message[:300])}")
     models = getattr(session, "models", None)
     if models:
         real = sum(usage_of(m)[0] for m in models)
@@ -281,6 +301,6 @@ def render_ai_dashboard(df, profile, data_key: str, *, session_factory: Optional
     elif stage == "cancelled":
         _simple("Cancelled. Nothing was built.", "info", "Start over", "ai_restart")
     elif stage == "error":
-        _simple(ss.get("ai_error", "Something went wrong."), "error", "Try again", "ai_restart")
+        _simple(_safe(ss.get("ai_error", "Something went wrong.")), "error", "Try again", "ai_restart")
     else:
         _idle(df, profile, session_factory)

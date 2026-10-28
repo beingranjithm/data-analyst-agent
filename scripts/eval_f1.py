@@ -2,6 +2,7 @@
 Run from the project root (the 14 F1 csv files in one folder):
     python scripts/eval_f1.py ~/Downloads/f1                  (first run: about 40 to 70 Gemini requests; answers are saved)
     python scripts/eval_f1.py ~/Downloads/f1 --replay         (re-use saved replies: NO Gemini requests, no key needed)
+    python scripts/eval_f1.py --demo                          (record the PUBLIC DEMO's answers on the small demo set)
     python scripts/eval_f1.py ~/Downloads/f1 --focus results  (analyse this table instead of the default one)
     also: --no-cache  --only 1,7,13  --category traps  --max-requests 80
 The AI sees only the text summary of the tables and small calculation results (at most 20 rows), never the tables.
@@ -17,7 +18,9 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-ap.add_argument("folder", help="folder with the F1 csv files")
+ap.add_argument("folder", nargs="?", default="", help="folder with the F1 csv files (not needed with --demo)")
+ap.add_argument("--demo", action="store_true",
+                help="the small demo set (sample_data/f1_demo): asks the demo questions and saves the answers to deploy/demo_cache.json")
 ap.add_argument("--focus", default="")
 ap.add_argument("--replay", action="store_true")
 ap.add_argument("--no-cache", action="store_true")
@@ -26,7 +29,13 @@ ap.add_argument("--category", default="")
 ap.add_argument("--max-requests", type=int, default=150)
 args = ap.parse_args()
 MODE = "replay" if args.replay else ("off" if args.no_cache else "use")
-folder = Path(args.folder).expanduser()
+if args.demo:
+    folder = ROOT / "sample_data" / "f1_demo"
+    os.environ.setdefault("DAA_CACHE_PATH", str(ROOT / "deploy" / "demo_cache.json"))    # the file the public demo replays
+elif args.folder:
+    folder = Path(args.folder).expanduser()
+else:
+    sys.exit("Give the folder with the F1 files, or use --demo. Nothing was sent.")
 files = sorted(folder.glob("*.csv"))
 if len(files) < 2:
     sys.exit(f"Expected several .csv files in {folder}. Nothing was sent.")
@@ -38,33 +47,25 @@ if MODE != "replay":
     if not (os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")):
         sys.exit("No API key found in hello_agent/.env (expected GOOGLE_API_KEY=...). Nothing was sent.")
 
-from agents.chat_agent import MAX_CODE_RUNS, ChatSession
 from agents.llm_factory import ROLE_MODELS, make_llm
-from agents.multi_chat import build_multi_chat
+from agents.multi_chat import chat_session_for, prepare_chat
 from agents.resilience import quiet_adk_logs
 from evals.chat_eval import FAIL, MINOR, NO_ANSWER, NOT_RUN, PASS, run_eval, save_report, summarize
-from evals.f1_eval import build_f1_questions, read_raw
-from tools.multi import build_flat, build_table, choose_focus, load_tables
-from tools.profiler import profile_dataframe
-from tools.relations import find_links
+from evals.f1_eval import build_demo_questions, build_f1_questions, read_raw
 from ui.dashboard_tab import usage_of
 
 quiet_adk_logs()
 print(f"Reading {len(files)} files ...", flush=True)
-tables, errors = load_tables([(f.name, f.read_bytes()) for f in files], build_table)
-for filename, message in errors:
+try:
+    prep = prepare_chat([(f.name, f.read_bytes()) for f in files], args.focus)
+except KeyError as e:
+    sys.exit(str(e.args[0]))
+for filename, message in prep["errors"]:
     print(f"  left out {filename}: {message}")
-frames = {n: t["df"] for n, t in tables.items()}
-links = [l for l in find_links(frames) if l.kind == "many-to-one"]
-focus = args.focus or choose_focus(frames, links)
-if focus not in frames:
-    sys.exit(f"No table called {focus!r}. Tables: {', '.join(frames)}")
-table, flat = build_flat(frames, focus, links, profile_dataframe, raw_tables=tables)
-active = f"{focus}_flat" if flat.joined else focus
-multi = build_multi_chat(active, table["df"], frames, links, origin={active: focus} if active != focus else {})
+table, multi, frames, links, active = prep["table"], prep["multi"], prep["frames"], prep["links"], prep["active"]
 print(f"{len(links)} links; analysing {active} ({len(table['df']):,} rows, {table['df'].shape[1]} columns)", flush=True)
 
-questions, skipped = build_f1_questions(read_raw(folder))
+questions, skipped = (build_demo_questions if args.demo else build_f1_questions)(read_raw(folder))
 if args.only:
     wanted = {int(x) for x in args.only.split(",") if x.strip().isdigit()}
     questions = [q for q in questions if q.id in wanted]
@@ -74,8 +75,7 @@ if not questions:
     sys.exit("No questions match. Nothing was sent.")
 
 model = make_llm("chat", mode=MODE)
-chat = ChatSession(table["profile"], model, tables=multi["tables"], runner=multi["runner"], extra_note=multi["note"],
-                   max_code_runs=MAX_CODE_RUNS,
+chat = chat_session_for(prep, model,
                    on_wait=lambda n, seconds, why: print(f"  (server busy, waiting {seconds:.0f}s, try {n}: {why[:80]})", flush=True))
 ICON = {PASS: "PASS ", MINOR: "MINOR", FAIL: "WRONG", NO_ANSWER: "NONE ", NOT_RUN: "SKIP "}
 
@@ -116,6 +116,6 @@ print(f"chat models -> {real} real request(s), {replayed} replayed from saved re
 meta = {"date": dt.date.today().isoformat(), "mode": MODE, "tables": len(frames), "analysed": active,
         "chat models": ", ".join(ROLE_MODELS["chat"]), "questions": f"{len(questions)} asked, {len(skipped)} skipped",
         "real requests": real, "replayed": replayed}
-path, replaced = save_report(results, skipped, meta, ROOT / "eval_results", name="f1_eval",
-                             title="Chat accuracy across several tables (Formula 1)")
+path, replaced = save_report(results, skipped, meta, ROOT / "eval_results", name="f1_demo_eval" if args.demo else "f1_eval",
+                             title="Chat accuracy across several tables (Formula 1" + (", demo set)" if args.demo else ")"))
 print(f"report: {path.relative_to(ROOT)}" + ("" if replaced else "  (smaller than the saved report, so the saved one was kept)"))

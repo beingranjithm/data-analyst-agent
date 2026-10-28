@@ -21,3 +21,6 @@ uploads/
 !sample_data/messy/*.csv
 # saved model replies (derived from your data profile)
 .cache/
+
+# Day 23b: the small public F1 demo set
+!sample_data/f1_demo/*.csv

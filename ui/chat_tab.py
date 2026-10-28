@@ -10,7 +10,8 @@ from typing import Callable, Optional
 
 import streamlit as st
 
-from ui.dashboard_tab import CACHE_MODES, PRIVACY_NOTE, api_key_available, usage_of
+from ui.hosted_ui import safe_text
+from ui.dashboard_tab import CACHE_MODES, PRIVACY_NOTE, api_key_available, cache_modes, usage_of  # noqa: F401
 
 SETTING_KEYS = ("chat_saved_mode",)          # kept when the dataset changes (ordinary keys: see dashboard_tab)
 LIMIT_NOTE = ("ℹ️ I answer from a summary of the data (column types, ranges, averages, categories). I cannot "
@@ -24,7 +25,8 @@ def default_session_factory(profile, settings):
     """Builds the real chat models (cache + pacing + fallback chain) and a ChatSession."""
     from agents.chat_agent import MAX_CODE_RUNS, ChatSession
     from agents.llm_factory import make_llm
-    model = make_llm("chat", mode=settings["cache_mode"])
+    from ui.hosted_ui import user_key
+    model = make_llm("chat", mode=settings["cache_mode"], api_key=user_key() or None)
     multi = settings.get("multi")                     # Day 22: {"tables", "note", "runner"} when several files were uploaded
     if multi:
         return ChatSession(profile, model, tables=multi["tables"], max_code_runs=MAX_CODE_RUNS,
@@ -80,7 +82,7 @@ def _starters(profile, can_calculate):
 
 
 def render_chat(profile, data_key: str, *, df=None, session_factory: Optional[Callable] = None, scope: str = "",
-                multi=None):
+                multi=None, starters=None):
     """Draws the tab. `data_key` identifies the dataset: a new key starts a new conversation.
     `df` is the data the AI may calculate on (None = answer from the summary only).
     `session_factory(profile, settings)` can replace the real models (tests do); settings holds the data as "df"."""
@@ -89,17 +91,19 @@ def render_chat(profile, data_key: str, *, df=None, session_factory: Optional[Ca
         _clear_chat()
         ss["chat_data_key"] = data_key
 
-    labels = list(CACHE_MODES)
+    labels = list(cache_modes())
     mode_label = st.selectbox("AI replies", labels, index=labels.index(ss.get("chat_saved_mode", labels[0])),
                               key="chat_cache_mode")
     ss["chat_saved_mode"] = mode_label
-    mode = CACHE_MODES[mode_label]
+    mode = cache_modes()[mode_label]
     needs_key = mode != "replay"
     blocked = False
     if needs_key:
         st.caption(PRIVACY_NOTE)
     if session_factory is None and needs_key and not api_key_available():
-        st.error("No Gemini API key found. Put GOOGLE_API_KEY=... in hello_agent/.env, or choose 'Replay only'.")
+        from tools.hosting import is_hosted
+        st.error("Paste your own Gemini key in the sidebar, or choose 'Replay only'." if is_hosted() else
+                 "No Gemini API key found. Put GOOGLE_API_KEY=... in hello_agent/.env, or choose 'Replay only'.")
         blocked = True
     st.caption(CALC_NOTE if df is not None else LIMIT_NOTE)
     if multi:
@@ -122,7 +126,7 @@ def render_chat(profile, data_key: str, *, df=None, session_factory: Optional[Ca
             session = (session_factory or default_session_factory)(profile, {"cache_mode": mode, "df": df, "scope": scope,
                                                                                      "multi": multi})
         except Exception as e:
-            st.error(f"Could not start the chat: {type(e).__name__}: {e}")
+            st.error(safe_text(f"Could not start the chat: {type(e).__name__}: {e}"))
             return
         session.transcript = list(transcript_kept)  # a changed setting keeps what was already said
         ss["chat_session"] = session
@@ -134,7 +138,9 @@ def render_chat(profile, data_key: str, *, df=None, session_factory: Optional[Ca
     question = None
     if not session.transcript:
         st.write("**Try one of these:**")
-        for i, q in enumerate(_starters(profile, df is not None)):
+        if starters:
+            st.caption("These questions have saved answers, so they also work with 'Replay only' and no key.")
+        for i, q in enumerate(starters or _starters(profile, df is not None)):
             if st.button(q, key=f"chat_starter_{i}"):
                 question = q
     typed = st.chat_input("Ask a question about this dataset", key="chat_input")
@@ -142,7 +148,7 @@ def render_chat(profile, data_key: str, *, df=None, session_factory: Optional[Ca
 
     error = ss.pop("chat_error", None)
     if error:
-        st.error(error)
+        st.error(safe_text(error))
 
     if question:
         with st.chat_message("user"):

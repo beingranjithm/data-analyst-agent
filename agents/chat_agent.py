@@ -315,7 +315,8 @@ def _first_frame(tables):
 
 def default_runner(code, tables):
     from tools.sandbox import run_code           # imported late: tests and the no-data chat do not need it
-    return run_code(code, tables, timeout=CALC_TIMEOUT)
+    from tools.hosting import sandbox_options
+    return run_code(code, tables, timeout=CALC_TIMEOUT, **sandbox_options())
 
 
 # ---------------------------------------------------------------- one shared event loop

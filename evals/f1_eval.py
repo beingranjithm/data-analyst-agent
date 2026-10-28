@@ -7,6 +7,7 @@ columns from other tables (a driver's name lives in 'drivers', a race's year in 
 """
 from __future__ import annotations
 
+import unicodedata
 from typing import Callable
 
 import pandas as pd
@@ -199,3 +200,97 @@ def build_f1_questions(raw: dict, definitions=None) -> tuple:
         except (KeyError, ValueError, TypeError, AttributeError, IndexError) as e:
             skipped.append((n, text, f"{type(e).__name__}: {str(e).strip(chr(39) + chr(34))}"))
     return questions, skipped
+
+
+# ------------------------------------------------------------------ Day 23b: the same kind of questions for the small demo set
+# (seasons 2021 and 2022). These are the questions the public demo can answer without a key, from saved replies.
+def _year_races(t, year):
+    r = t["races"]
+    return r[r.year == year]
+
+
+def _d_races_2022(t):
+    n = len(_year_races(t, 2022))
+    return Expectation(numbers=[n], describe=f"{n} races in 2022")
+
+
+def _d_most_wins_2021(t):
+    ids = set(_year_races(t, 2021).raceId)
+    w = t["results"][(t["results"].raceId.isin(ids)) & (t["results"].position == 1)]
+    w = w.merge(t["drivers"], on="driverId").groupby("surname").size()
+    sn, n = _top(w)
+    return Expectation(numbers=[int(n)], names=[sn], describe=f"{sn}, {n} wins in 2021")
+
+
+def _d_constructor_wins_2022(t):
+    ids = set(_year_races(t, 2022).raceId)
+    w = t["results"][(t["results"].raceId.isin(ids)) & (t["results"].position == 1)]
+    w = w.merge(t["constructors"], on="constructorId").groupby("name").size()
+    name, n = _top(w)
+    return Expectation(numbers=[int(n)], names=[name], describe=f"{name}, {n} wins in 2022")
+
+
+def _d_drivers_2021(t):
+    ids = set(_year_races(t, 2021).raceId)
+    n = int(t["results"][t["results"].raceId.isin(ids)].driverId.nunique())
+    return Expectation(numbers=[n], describe=f"{n} different drivers in 2021")
+
+
+def _d_countries_2022(t):
+    c = _year_races(t, 2022)[["circuitId"]].merge(t["circuits"][["circuitId", "country"]], on="circuitId")
+    n = int(c.country.nunique())
+    return Expectation(numbers=[n], describe=f"{n} different countries hosted a race in 2022")
+
+
+def _d_verstappen_pits_2022(t):
+    v = _driver(t, "Verstappen", "Max")
+    ids = set(_year_races(t, 2022).raceId)
+    p = t["pit_stops"]
+    n = int(((p.driverId == v) & (p.raceId.isin(ids))).sum())
+    return Expectation(numbers=[n], describe=f"{n} pit-stop rows for Verstappen in 2022")
+
+
+def _d_hamilton_avg_lap_2021(t):
+    h = _driver(t, "Hamilton", "Lewis")
+    ids = set(_year_races(t, 2021).raceId)
+    l = t["lap_times"]
+    m = float(l[(l.driverId == h) & (l.raceId.isin(ids))].milliseconds.mean())
+    return Expectation(numbers=[(round(m), round(m, 1), round(m, 2))],
+                       describe=f"{m:,.1f} ms: mean lap time of Hamilton in 2021")
+
+
+def _d_monaco_winner_pits(t):
+    ra = t["races"]
+    race = ra[(ra.year == 2022) & (ra.name == "Monaco Grand Prix")]
+    if len(race) != 1:
+        raise ValueError("no unique 2022 Monaco Grand Prix")
+    rid = int(race.raceId.iloc[0])
+    w = t["results"][(t["results"].raceId == rid) & (t["results"].position == 1)]
+    if len(w) != 1:
+        raise ValueError("no unique winner")
+    did = int(w.driverId.iloc[0])
+    p = t["pit_stops"]
+    n = int(((p.raceId == rid) & (p.driverId == did)).sum())
+    sn = t["drivers"].set_index("driverId").surname[did]
+    plain = unicodedata.normalize("NFKD", sn).encode("ascii", "ignore").decode()          # Pérez -> Perez
+    return Expectation(numbers=[n], names=[(sn, plain)], describe=f"winner {sn}, {n} pit stops in the 2022 Monaco Grand Prix")
+
+
+DEMO_DEFINITIONS: list = [
+    ("one table", "How many races were held in 2022?", _d_races_2022),
+    ("lookup columns", "Which driver won the most races in 2021, and how many?", _d_most_wins_2021),
+    ("lookup columns", "Which constructor won the most races in 2022, and how many?", _d_constructor_wins_2022),
+    ("lookup columns", "How many different drivers took part in 2021?", _d_drivers_2021),
+    ("lookup columns", "How many different countries hosted a race in 2022?", _d_countries_2022),
+    ("other event table", "How many pit stops did Max Verstappen make in 2022?", _d_verstappen_pits_2022),
+    ("other event table", "What was Lewis Hamilton's average lap time in milliseconds in 2021?", _d_hamilton_avg_lap_2021),
+    ("other event table", "Which driver set the fastest lap in the lap times data?", _q_fastest_lap_driver),
+    ("two event tables", "How many pit stops did the winner of the 2022 Monaco Grand Prix make, and who was it?", _d_monaco_winner_pits),
+    ("traps", "What was the average attendance at each race?", _q_trap_attendance),
+    ("traps", "Who won the 2030 world championship?", _q_trap_future),
+]
+DEMO_QUESTIONS = [text for _, text, _ in DEMO_DEFINITIONS]
+
+
+def build_demo_questions(raw: dict) -> tuple:
+    return build_f1_questions(raw, DEMO_DEFINITIONS)

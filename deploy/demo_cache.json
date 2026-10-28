@@ -1,0 +1,172 @@
+{
+ "5a1af9f219473597e0fab7c728eb3a4b9816a3037c2a711e717349b59931b9ff": {
+  "text": "```python\nraces_2022 = tables['races'][tables['races']['year'] == 2022]\nresult = pd.Series(dict(\n    races_count=races_2022['raceId'].nunique(),\n    rows_matched=len(races_2022)\n))\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:20:27+00:00"
+ },
+ "7f52f05bad604e795d564ce5e38ed4d9cea02e63d78a581e9e883a7d6ad5e916": {
+  "text": "There were 22 races held in 2022.",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:20:50+00:00"
+ },
+ "095313e76bd3801e638d69bf8bc1c288a50999241b083914bbfd4f605d4dade6": {
+  "text": "```python\n# Filter for 2021 races where the driver finished in position 1\ndf_2021 = df[df['races_year'] == '2021']\nwins_2021 = df_2021[df_2021['position'] == 1]\n\n# Count wins per driver\ndriver_wins = wins_2021.groupby(['forename', 'surname', 'driverRef'])['raceId'].nunique().reset_index(name='wins')\ntop_driver = driver_wins.sort_values(by='wins', ascending=False).iloc[0]\n\nresult = pd.Series({\n    'driver': f\"{top_driver['forename']} {top_driver['surname']}\",\n    'wins': top_driver['wins'],\n    'rows_matched': len(wins_2021)\n})\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:21:15+00:00"
+ },
+ "dd3068d043639e8dbe65ffcf36c58676a9277ea766dfe183f46e968a352dbf9c": {
+  "text": "```python\n# Filter for 2021 races where the driver finished in position 1\ndf_2021 = df[df['races_year'] == 2021]\nwins_2021 = df_2021[df_2021['position'] == 1]\n\n# Count wins per driver\ndriver_wins = wins_2021.groupby(['forename', 'surname', 'driverRef'])['raceId'].nunique().reset_index(name='wins')\ntop_driver = driver_wins.sort_values(by='wins', ascending=False).iloc[0]\n\nresult = pd.Series({\n    'driver': f\"{top_driver['forename']} {top_driver['surname']}\",\n    'wins': top_driver['wins'],\n    'rows_matched': len(wins_2021)\n})\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:21:35+00:00"
+ },
+ "6237c650f93bc3fca22582064dc832e7c22643f1112b3c8cf44a076c36499fac": {
+  "text": "In 2021, Max Verstappen won the most races, taking 10 victories out of the 22 races matched that season.",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:21:58+00:00"
+ },
+ "1d735379f0ab8ceb2a07182db8fff0e9ece454f69fbcaa13fa827319f51dc3c7": {
+  "text": "```python\ndf_2022 = df[df['races_year'] == '2022']\n# A race win corresponds to positionOrder == 1\nwinners_2022 = df_2022[df_2022['positionOrder'] == 1]\nwin_counts = winners_2022['constructors_name'].value_counts()\nresult = pd.Series(dict(\n    constructor=win_counts.index[0] if len(win_counts) > 0 else 'None',\n    wins=win_counts.iloc[0] if len(win_counts) > 0 else 0,\n    rows_matched=len(winners_2022)\n))\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:22:15+00:00"
+ },
+ "9be5c81668e8d4c50247cbe2ffd5eb39d32e09afb77933bcc32717dd593584d1": {
+  "text": "```python\ndf_2022 = df[df['races_year'] == 2022]\nwinners_2022 = df_2022[df_2022['positionOrder'] == 1]\nwin_counts = winners_2022['constructors_name'].value_counts()\nresult = pd.Series(dict(\n    constructor=win_counts.index[0] if len(win_counts) > 0 else 'None',\n    wins=win_counts.iloc[0] if len(win_counts) > 0 else 0,\n    rows_matched=len(winners_2022)\n))\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:22:33+00:00"
+ },
+ "9fc1c028e4e00f4e02dafcd00eec33c2aaed892d0fd9c85f8016fb99ba4f66ca": {
+  "text": "In 2022, Red Bull won the most races with a total of 17 wins (out of 22 matched rows for first-place finishes).",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:22:52+00:00"
+ },
+ "00f91f9ee4d0a1b866635462bc2b2730447efad542d510418e6906eeeb147525": {
+  "text": "```python\ndf_2021 = df[df['races_year'] == '2021']\nresult = pd.Series({\n    'unique_drivers': df_2021['driverId'].nunique(),\n    'rows_matched': len(df_2021)\n})\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:23:26+00:00"
+ },
+ "8e0f449a028476af2f02f66825fb2f4f4f493d0f3a8854a28e276f361c41e50c": {
+  "text": "```python\ndf_2021 = df[df['races_year'] == 2021]\nresult = pd.Series({\n    'unique_drivers': df_2021['driverId'].nunique(),\n    'rows_matched': len(df_2021)\n})\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:23:55+00:00"
+ },
+ "6884eb6d1da487e744f6a4856369c0310125dabc9c3a844fe53db3bf18e734cb": {
+  "text": "In 2021, a total of 21 different drivers took part, across 440 matched race result rows.",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:23:56+00:00"
+ },
+ "901d58cfc5ceaad4d6201eb7ae8545b724c63b9440f0bc9a4b88fa46835225e3": {
+  "text": "```python\ndf_2022 = df[df['races_year'] == '2022']\nresult = pd.Series(dict(\n    countries_count=df_2022['circuits_country'].nunique(),\n    rows_matched=len(df_2022)\n))\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:24:02+00:00"
+ },
+ "67f36160e75548461d222fc5ba65b92535cd354d52c8ada7cf672e605c90ac0e": {
+  "text": "```python\ndf_2022 = df[df['races_year'] == 2022]\nresult = pd.Series(dict(\n    countries_count=df_2022['circuits_country'].nunique(),\n    rows_matched=len(df_2022)\n))\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:24:06+00:00"
+ },
+ "b7f49ddf551a147d8c7b2e145207011b53f8226b9e3deba18309482a08707521": {
+  "text": "In 2022, races were hosted across 20 different countries, with 440 total rows matched in the dataset for that year.",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:24:13+00:00"
+ },
+ "dd6bec7a9a7b905f807596e57c166e765605e06bd0d4d38b5a60c1545861a611": {
+  "text": "```python\npit_stops = tables['pit_stops']\ndrivers = tables['drivers']\nraces = tables['races']\n\n# Filter drivers for Max Verstappen\nmax_driver = drivers[(drivers['forename'] == 'Max') & (drivers['surname'] == 'Verstappen')]\ndriver_id = max_driver['driverId'].iloc[0]\n\n# Filter races for year 2022\nraces_2022 = races[races['year'] == 2022]\nrace_ids_2022 = races_2022['raceId']\n\n# Filter pit stops for Max Verstappen in 2022\nfiltered_pits = pit_stops[\n    (pit_stops['driverId'] == driver_id) & \n    (pit_stops['raceId'].isin(race_ids_2022))\n]\n\nresult = pd.Series({\n    'pit_stops_count': len(filtered_pits),\n    'rows_matched': len(filtered_pits)\n})\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:24:40+00:00"
+ },
+ "b036371907b4e91288315f446739ca88ccf48dcdfea3e7451b5529dd658433fd": {
+  "text": "Max Verstappen made a total of 47 pit stops during the 2022 season (across 47 matched pit stop records).",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:25:29+00:00"
+ },
+ "af9ffb45fc0dd5878316780d914f8a365f04b52340b0b43d4fec652fe4469275": {
+  "text": "```python\nlap_df = tables['lap_times']\nraces_df = tables['races']\ndrivers_df = tables['drivers']\n\nmerged = lap_df.merge(races_df[['raceId', 'year']], on='raceId', how='left')\nmerged = merged.merge(drivers_df[['driverId', 'driverRef']], on='driverId', how='left')\n\nhamilton_2021 = merged[(merged['driverRef'] == 'hamilton') & (merged['year'] == 2021)]\navg_time = hamilton_2021['milliseconds'].mean()\nrows_matched = len(hamilton_2021)\n\nresult = pd.Series(dict(average_milliseconds=avg_time, rows_matched=rows_matched))\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:26:03+00:00"
+ },
+ "b3b0661a4d4da9c2313f55759ddc36ecdd7fb34dc44a13d2ba29e9cae91a6751": {
+  "text": "Lewis Hamilton's average lap time in milliseconds in 2021 was 96,207.25 milliseconds, calculated across 1269 laps.",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:26:23+00:00"
+ },
+ "0ee391e7c8eb0b9c88cc89ab720929b9f2b361bd2811d80bf868a4e2bcd0dcc9": {
+  "text": "```python\n# Join lap_times with drivers to find the driver who set the fastest lap (minimum time / milliseconds)\nlap_times_df = tables['lap_times']\ndrivers_df = tables['drivers']\n\nmerged = lap_times_df.merge(drivers_df, on='driverId', how='left')\nfastest_lap_row = merged.loc[merged['milliseconds'].idxmin()]\n\nresult = {\n    'driver': f\"{fastest_lap_row['forename']} {fastest_lap_row['surname']}\",\n    'code': fastest_lap_row['code'],\n    'time': fastest_lap_row['time'],\n    'milliseconds': fastest_lap_row['milliseconds'],\n    'lap': fastest_lap_row['lap'],\n    'raceId': fastest_lap_row['raceId']\n}\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:27:50+00:00"
+ },
+ "5a32e575b730021823e57c36013a47674e0a5ee8d886afe119b35ed352e3e609": {
+  "text": "Max Verstappen (driver code VER) set the fastest lap in the lap times data with a time of 66,200 milliseconds on lap 62 of race ID 1060.",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:28:17+00:00"
+ },
+ "25ad0e8d15252e1bbfe4004dc6a9be28535d2836a43067492e32a3f1957ed866": {
+  "text": "```python\n# First, find the raceId for the 2022 Monaco Grand Prix\nraces_df = tables['races']\nmonaco_2022 = races_df[(races_df['year'] == 2022) & (races_df['name'].str.contains('Monaco', case=False, na=False))]\n\nif len(monaco_2022) == 0:\n    result = \"Monaco Grand Prix 2022 not found\"\nelse:\n    race_id = monaco_2022['raceId'].iloc[0]\n    \n    # Find the winner (position == 1 or positionOrder == 1) of this race in results\n    results_df = tables['results']\n    winner_row = results_df[(results_df['raceId'] == race_id) & (results_df['positionOrder'] == 1)]\n    \n    if len(winner_row) == 0:\n        result = \"Winner not found for this race\"\n    else:\n        driver_id = winner_row['driverId'].iloc[0]\n        \n        # Get driver details\n        drivers_df = tables['drivers']\n        driver_info = drivers_df[drivers_df['driverId'] == driver_id].iloc[0]\n        driver_name = f\"{driver_info['forename']} {driver_info['surname']}\"\n        \n        # Count pit stops for this driver in this race\n        pit_stops_df = tables['pit_stops']\n        driver_stops = pit_stops_df[(pit_stops_df['raceId'] == race_id) & (pit_stops_df['driverId'] == driver_id)]\n        num_stops = len(driver_stops)\n        \n        result = pd.Series({\n            'driver_name': driver_name,\n            'pit_stops': num_stops,\n            'rows_matched': len(winner_row)\n        })\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:28:55+00:00"
+ },
+ "f1f356e9e2cfef52a2fdba30e48a520d3d4460ae8119352c55312a954c821b1b": {
+  "text": "The winner of the 2022 Monaco Grand Prix was Sergio P\u00e9rez, and he made 3 pit stops during the race.",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:29:16+00:00"
+ },
+ "b4832b0c507f4ea21dcb8a2b7893d493cf4e7de28e157e50fde1bcbe75c81c82": {
+  "text": "```python\n# Check if attendance is in the dataset or if we need another table\n# The dataset has circuits location, alt, lat, lng, but no attendance column.\n# Let's check tables keys or columns to see if there's any attendance data.\nresult = list(tables.keys())\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:29:20+00:00"
+ },
+ "7bf34d1d6a18d3f5a2e4bbea7284cdc0c47c22bf16e410848f42e860429bc26a": {
+  "text": "The provided dataset and related tables do not contain information about race attendance.",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:29:31+00:00"
+ },
+ "885c70475a388e3905b55c08a44e16275ba16719bd9566e7ce0994581d963e1f": {
+  "text": "```python\nresult = df['races_year'].unique()\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:29:47+00:00"
+ },
+ "c8762510cf52c80a0c16fbd9dd67006c64413f656c185ae07b885819666d36f1": {
+  "text": "The dataset only contains information for the 2021 and 2022 Formula 1 seasons, so it does not include data for 2030 to determine who won the world championship that year.",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:29:51+00:00"
+ },
+ "2385c9532e84f728ff20603dd6673d82777a00b25bf1d1fa82646da6b669f082": {
+  "text": "{\"title\":\"Formula 1 Grand Prix Performance Dashboard (2021-2022)\",\"summary\":\"An analytical overview of F1 race results, driver grid-to-finish dynamics, speed distributions, and constructor point tallies across 2021 and 2022.\",\"kpis\":[{\"label\":\"Total Points Awarded\",\"measure\":\"points\",\"agg\":\"sum\"},{\"label\":\"Average Fastest Lap Speed (km/h)\",\"measure\":\"fastestLapSpeed\",\"agg\":\"mean\"},{\"label\":\"Average Starting Grid Position\",\"measure\":\"grid\",\"agg\":\"mean\"},{\"label\":\"Total Laps Completed\",\"measure\":\"laps\",\"agg\":\"sum\"}],\"charts\":[{\"type\":\"line\",\"title\":\"Points Awarded Over Time\",\"why\":\"Track performance and points distribution across race dates during the 2021 and 2022 seasons.\",\"time\":\"races_date\",\"dimension\":null,\"measure\":\"points\",\"agg\":\"sum\",\"x\":null,\"y\":null,\"color\":null,\"measures\":null},{\"type\":\"bar\",\"title\":\"Total Points Scored by Constructor\",\"why\":\"Compare total point contributions across teams to identify dominant constructors.\",\"time\":null,\"dimension\":\"constructors_name\",\"measure\":\"points\",\"agg\":\"sum\",\"x\":null,\"y\":null,\"color\":null,\"measures\":null},{\"type\":\"scatter\",\"title\":\"Starting Grid vs. Finishing Position Order\",\"why\":\"Evaluate the relationship between qualifying position and actual race outcome, colored by season.\",\"time\":null,\"dimension\":null,\"measure\":null,\"agg\":null,\"x\":\"grid\",\"y\":\"positionOrder\",\"color\":\"races_year\",\"measures\":null},{\"type\":\"box\",\"title\":\"Fastest Lap Speed Distribution by Constructor\",\"why\":\"Examine speed spread and variance across constructor setups and race tactics.\",\"time\":null,\"dimension\":\"constructors_name\",\"measure\":\"fastestLapSpeed\",\"agg\":null,\"x\":null,\"y\":null,\"color\":null,\"measures\":null},{\"type\":\"histogram\",\"title\":\"Distribution of Driver Fastest Lap Speeds\",\"why\":\"Visualize the overall frequency and spread of maximum speeds recorded during races (51 missing records omitted).\",\"time\":null,\"dimension\":null,\"measure\":\"fastestLapSpeed\",\"agg\":null,\"x\":null,\"y\":null,\"color\":null,\"measures\":null},{\"type\":\"donut\",\"title\":\"Race Share by Season\",\"why\":\"Display the relative proportion of race result records split between the 2021 and 2022 seasons.\",\"time\":null,\"dimension\":\"races_year\",\"measure\":\"resultId\",\"agg\":\"count\",\"x\":null,\"y\":null,\"color\":null,\"measures\":null},{\"type\":\"heatmap\",\"title\":\"Race Performance Metrics Correlation\",\"why\":\"Identify linear relationships between grid start, finishing order, points, laps, and top speed.\",\"time\":null,\"dimension\":null,\"measure\":null,\"agg\":null,\"x\":null,\"y\":null,\"color\":null,\"measures\":[\"grid\",\"positionOrder\",\"points\",\"laps\",\"fastestLapSpeed\"]}]}",
+  "model": "gemini-3.6-flash",
+  "saved": "2026-10-28T14:31:14+00:00"
+ },
+ "d668bd0fc40ae1e7390a3c75f5a16487d8becf02d7feeea233a1c43f5200a717": {
+  "text": "{\"title\":\"Formula 1 Season Performance Dashboard\",\"summary\":\"An overview of Formula 1 driver and constructor race results across the 2021 and 2022 seasons. It highlights scoring patterns, grid-to-finish correlations, and speed performance metrics across teams and circuits.\",\"kpis\":[{\"label\":\"Total Points Awarded\",\"measure\":\"points\",\"agg\":\"sum\"},{\"label\":\"Average Fastest Lap Speed\",\"measure\":\"fastestLapSpeed\",\"agg\":\"mean\"},{\"label\":\"Average Grid Position\",\"measure\":\"grid\",\"agg\":\"mean\"},{\"label\":\"Max Laps Completed\",\"measure\":\"laps\",\"agg\":\"max\"}],\"charts\":[{\"type\":\"line\",\"title\":\"Average Fastest Lap Speed Over Time\",\"why\":\"Track race speed evolution across the 2021 and 2022 Grand Prix calendar. Note that 51 rows were excluded due to missing speed values.\",\"time\":\"races_date\",\"measure\":\"fastestLapSpeed\",\"agg\":\"mean\",\"color\":null,\"measures\":null},{\"type\":\"bar\",\"title\":\"Total Points by Constructor Name\",\"why\":\"Compare total point contributions across constructor teams to identify leading constructors.\",\"dimension\":\"constructors_name\",\"measure\":\"points\",\"agg\":\"sum\",\"color\":null,\"measures\":null},{\"type\":\"bar\",\"title\":\"Total Points by Driver Nationality\",\"why\":\"Evaluate which driver nationalities account for the highest aggregate points.\",\"dimension\":\"drivers_nationality\",\"measure\":\"points\",\"agg\":\"sum\",\"color\":null,\"measures\":null},{\"type\":\"scatter\",\"title\":\"Starting Grid Position vs Final Finishing Position\",\"why\":\"Investigate how heavily qualifying grid position correlates with final race position order.\",\"x\":\"grid\",\"y\":\"positionOrder\",\"color\":\"races_year\",\"measures\":null},{\"type\":\"box\",\"title\":\"Fastest Lap Speed Distribution by Constructor\",\"why\":\"Visualize speed variance and outliers across top constructors. Note that 51 rows were excluded due to missing speed data.\",\"dimension\":\"constructors_name\",\"measure\":\"fastestLapSpeed\",\"color\":null,\"measures\":null},{\"type\":\"donut\",\"title\":\"Share of Total Points by Season Year\",\"why\":\"Compare total points scored between the 2021 and 2022 season years, which has only 2 categories.\",\"dimension\":\"races_year\",\"measure\":\"points\",\"agg\":\"sum\",\"color\":null,\"measures\":null},{\"type\":\"heatmap\",\"title\":\"Correlation Heatmap of Race Performance Metrics\",\"why\":\"Explore linear relationships between grid start, finish position, points, laps, and speed.\",\"measures\":[\"grid\",\"positionOrder\",\"points\",\"laps\",\"fastestLapSpeed\"]},{\"type\":\"histogram\",\"title\":\"Distribution of Points Scored Per Entry\",\"why\":\"Understand the frequency and distribution of points awarded per race entry.\",\"measure\":\"points\"}]}",
+  "model": "gemini-3.6-flash",
+  "saved": "2026-10-28T14:31:51+00:00"
+ },
+ "21f211e4ebadae989084f238ca639ffd29edc497967f4089865b34ab5190aeb4": {
+  "text": "```python\n# Prepare a copy of the dataframe and aggregate fastest lap speed by race date\ndf_chart = df.dropna(subset=['fastestLapSpeed', 'races_date']).copy()\nexcluded_count = len(df) - len(df_chart)\n\n# Group by date (and race name for good measure) to find the mean fastest lap speed per race\ndf_agg = (\n    df_chart.groupby(['races_date', 'races_name'], as_index=False)['fastestLapSpeed']\n    .mean()\n    .sort_values('races_date')\n)\n\n# Create the line chart using Plotly Express\nfig = px.line(\n    df_agg,\n    x='races_date',\n    y='fastestLapSpeed',\n    markers=True,\n    hover_name='races_name',\n    labels={\n        'races_date': 'Race Date',\n        'fastestLapSpeed': 'Average Fastest Lap Speed (km/h)'\n    },\n    title='Average Fastest Lap Speed Over Time'\n)\n\n# Enhance layout for dashboard integration and dark/light compatibility\nfig.update_layout(\n    title_font_size=16,\n    xaxis_title='Race Date',\n    yaxis_title='Average Fastest Lap Speed (km/h)',\n    template='plotly_white',\n    hovermode='x unified',\n    margin=dict(t=50, b=50, l=50, r=50)\n)\n\n# Add an annotation if rows were excluded due to missing speed values\nif excluded_count > 0:\n    fig.add_annotation(\n        text=f\"Note: {excluded_count} rows were excluded due to missing speed values.\",\n        xref=\"paper\", yref=\"paper\",\n        x=0, y=-0.2,\n        showarrow=False,\n        font=dict(size=10, color=\"gray\")\n    )\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:32:15+00:00"
+ },
+ "d0192a9ea5f644aeb88917eaeee95a95b825323fcaecb475bb49f269a34ffc2a": {
+  "text": "```python\n# Aggregate points by constructor name\nagg_df = df.groupby('constructors_name', as_index=False)['points'].sum()\n\n# Sort descending and take top 15 constructors\nagg_df = agg_df.sort_values(by='points', ascending=False).head(15)\n\n# Sort ascending for plotting horizontal bars from top to bottom\nplot_df = agg_df.sort_values(by='points', ascending=True)\n\n# Create the bar chart\nfig = px.bar(\n    plot_df,\n    x='points',\n    y='constructors_name',\n    orientation='h',\n    title='Total Points by Constructor Name',\n    labels={\n        'points': 'Total Points',\n        'constructors_name': 'Constructor'\n    }\n)\n\n# Customize layout for dark theme and clean aesthetics\nfig.update_layout(\n    template='plotly_dark',\n    plot_bgcolor='rgba(0,0,0,0)',\n    paper_bgcolor='rgba(0,0,0,0)',\n    margin=dict(t=60, b=40, l=120, r=40),\n    xaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.1)'),\n    yaxis=dict(showgrid=False)\n)\n\n# Update bar colors\nfig.update_traces(marker_color='#1f77b4', hovertemplate='<b>%{y}</b><br>Total Points: %{x}<extra></extra>')\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:32:38+00:00"
+ },
+ "6d7690fd8c27dac00eec63b26fa947fa61aa4dd7b3cfb29d8a53bfd9c52baa9f": {
+  "text": "```python\n# Create a copy of the dataframe for aggregation\ndf_chart = df[['drivers_nationality', 'points']].dropna().copy()\n\n# Group by drivers_nationality and sum the points\nagg_df = df_chart.groupby('drivers_nationality', as_index=False)['points'].sum()\n\n# Sort by points descending and take the top 15\nagg_df = agg_df.sort_values(by='points', ascending=False).head(15)\n\n# Sort ascending for horizontal bar chart so the largest is at the top\nagg_df = agg_df.sort_values(by='points', ascending=True)\n\n# Create the horizontal bar chart\nfig = px.bar(\n    agg_df,\n    x='points',\n    y='drivers_nationality',\n    orientation='h',\n    title='Total Points by Driver Nationality',\n    labels={\n        'points': 'Total Points',\n        'drivers_nationality': 'Driver Nationality'\n    }\n)\n\n# Customize layout for clean dashboard appearance\nfig.update_layout(\n    title_font_size=16,\n    xaxis_title='Total Points',\n    yaxis_title=None,\n    margin=dict(l=20, r=20, t=50, b=20),\n    template='plotly_white'\n)\n\n# Optional: Add data labels inside or next to the bars for readability\nfig.update_traces(texttemplate='%{x:.1f}', textposition='outside')\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:33:00+00:00"
+ },
+ "714ff7d0c3e01cd92074a4b18909da2d7309365da365e325de2c5488fb370514": {
+  "text": "```python\n# Create a copy of the dataframe with filtered necessary columns\ndf_chart = df[['grid', 'positionOrder', 'races_year']].copy()\n\n# Drop missing values in the needed columns\ninitial_count = len(df_chart)\ndf_chart = df_chart.dropna(subset=['grid', 'positionOrder', 'races_year'])\nexcluded_count = initial_count - len(df_chart)\n\n# Build scatter plot with plotly express\nfig = px.scatter(\n    df_chart,\n    x='grid',\n    y='positionOrder',\n    color='races_year',\n    opacity=0.6,\n    title='Starting Grid Position vs Final Finishing Position',\n    labels={\n        'grid': 'Starting Grid Position',\n        'positionOrder': 'Final Finishing Position',\n        'races_year': 'Season Year'\n    }\n)\n\n# Enhance layout for dashboard consistency\nfig.update_layout(\n    template='plotly_white',\n    title_font_size=16,\n    xaxis_title='Starting Grid Position',\n    yaxis_title='Final Finishing Position',\n    legend_title='Season'\n)\n\n# Add annotation if rows were excluded\nif excluded_count > 0:\n    fig.add_annotation(\n        text=f\"Note: {excluded_count} rows excluded due to missing values.\",\n        xref=\"paper\", yref=\"paper\",\n        x=0, y=-0.15,\n        showarrow=False,\n        font=dict(size=10, color=\"gray\")\n    )\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:33:26+00:00"
+ },
+ "58c4f19cd9a8da9a08384211ded167ac57fb33b9152e5804e3e08ec9d88c2b95": {
+  "text": "```python\n# Create a copy and clean data by dropping missing values for the box plot variables\nchart_df = df.dropna(subset=['constructors_name', 'fastestLapSpeed']).copy()\n\n# Calculate total excluded rows due to missing data for the annotation\nexcluded_count = len(df) - len(chart_df)\n\n# Group by constructor to find the top constructors by median speed or count, then limit to top 15\ntop_constructors = (\n    chart_df.groupby('constructors_name')['fastestLapSpeed']\n    .median()\n    .sort_values(ascending=False)\n    .head(15)\n    .index\n)\n\nchart_df = chart_df[chart_df['constructors_name'].isin(top_constructors)]\n\n# Create the box plot using Plotly Express\nfig = px.box(\n    chart_df,\n    x='constructors_name',\n    y='fastestLapSpeed',\n    category_orders={'constructors_name': list(top_constructors)},\n    labels={\n        'constructors_name': 'Constructor',\n        'fastestLapSpeed': 'Fastest Lap Speed'\n    },\n    title='Fastest Lap Speed Distribution by Constructor'\n)\n\n# Apply consistent dashboard styling\nfig.update_layout(\n    template='plotly_dark',\n    plot_bgcolor='rgba(0,0,0,0)',\n    paper_bgcolor='rgba(0,0,0,0)',\n    font=dict(color='#FAFAFA', family='Inter, sans-serif'),\n    title=dict(font=dict(size=18, color='#FAFAFA')),\n    xaxis=dict(\n        title='Constructor',\n        tickangle=-30,\n        showgrid=False\n    ),\n    yaxis=dict(\n        title='Fastest Lap Speed',\n        showgrid=True,\n        gridcolor='rgba(255,255,255,0.1)'\n    ),\n    margin=dict(l=60, r=40, t=80, b=80)\n)\n\n# Add annotation regarding excluded rows if any were dropped\nif excluded_count > 0:\n    fig.add_annotation(\n        text=f\"Note: {excluded_count} rows were excluded due to missing speed data.\",\n        xref=\"paper\", yref=\"paper\",\n        x=0, y=-0.25,\n        showarrow=False,\n        font=dict(size=11, color=\"rgba(255,255,255,0.6)\")\n    )\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:33:43+00:00"
+ },
+ "b7f03946eafe517f40fa3de5dce927a4d78af3fda2d091a21e2371c18c1f3a51": {
+  "text": "```python\n# Aggregate points by races_year\nagg_df = df.groupby('races_year')['points'].sum().reset_index()\n\n# Create the donut chart\nfig = px.pie(\n    agg_df,\n    names='races_year',\n    values='points',\n    title='Share of Total Points by Season Year',\n    hole=0.4,\n)\n\n# Update layout for proper display styling\nfig.update_layout(\n    title_x=0.5,\n    legend_title='Season Year',\n    margin=dict(t=60, b=40, l=40, r=40)\n)\n\nfig.update_traces(textinfo='percent+label')\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-10-28T14:34:07+00:00"
+ }
+}

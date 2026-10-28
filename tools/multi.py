@@ -67,11 +67,13 @@ def files_signature(files) -> str:
 
 def check_limits(files) -> str:
     """'' when the upload is acceptable, otherwise a message for the person."""
-    if len(files) > MAX_FILES:
-        return f"That is {len(files)} files. The limit is {MAX_FILES} files at a time."
+    from tools.hosting import upload_limits
+    max_files, max_total = upload_limits(MAX_FILES, MAX_TOTAL_MB)         # smaller on the public host
+    if len(files) > max_files:
+        return f"That is {len(files)} files. The limit is {max_files} files at a time."
     total = sum(len(d) for _, d in files) / (1024 * 1024)
-    if total > MAX_TOTAL_MB:
-        return f"These files add up to {total:,.0f} MB. The limit is {MAX_TOTAL_MB} MB in total."
+    if total > max_total:
+        return f"These files add up to {total:,.0f} MB. The limit is {max_total} MB in total."
     return ""
 
 

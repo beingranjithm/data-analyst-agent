@@ -20,13 +20,18 @@ from ui.filter_panel import render_filter_panel  # noqa: E402
 from ui.kpi_card import show_kpi  # noqa: E402  (Day 20)
 from tools.multi import build_table  # noqa: E402  (Day 21: shared with the several-files path)
 from ui.multi_panel import render_multi  # noqa: E402  (Day 21)
+from tools.hosting import file_limit_mb, is_hosted, isolation_ok  # noqa: E402  (Day 23a: public host)
+from ui.hosted_ui import render_hosted_sidebar  # noqa: E402
 
 st.set_page_config(page_title="Agentic Data Analyst", page_icon="📊", layout="wide")
+render_hosted_sidebar()                                   # Day 23a: banner + the visitor's own key (public host only)
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE_PATH = ROOT / "sample_data" / "sales_sample.csv"
 MESSY_DIR = ROOT / "sample_data" / "messy"
-MAX_MB = 50
+DEMO_DIR = ROOT / "sample_data" / "f1_demo"                 # Day 23b: the small Formula 1 demo set
+DEMO_LABEL = "Formula 1 demo set (2021-2022)"
+MAX_MB = file_limit_mb(50)
 ROLE_LABELS = {
     "numeric": "🔢 numeric", "datetime": "📅 date/time", "categorical": "🏷️ category",
     "boolean": "✅ yes/no", "id": "🔑 identifier", "text": "📝 free text",
@@ -57,10 +62,18 @@ st.caption("Upload a CSV, or pick a built-in file. The '✨ AI dashboard' tab pl
            "every number. Filters are in the sidebar.")  # Day 20
 
 # ---- choose the data source ----
-source = st.sidebar.radio("Data source", ["Upload my own CSV", "Built-in sample sales data", "Messy test file"])
+SOURCES = ["Upload my own CSV", "Built-in sample sales data", DEMO_LABEL] + ([] if is_hosted() else ["Messy test file"])
+source = st.sidebar.radio("Data source", SOURCES, index=SOURCES.index(DEMO_LABEL) if is_hosted() else 0,
+                              key="data_source")
 name, data, batch = None, None, None
 
-if source == "Built-in sample sales data":
+if source == DEMO_LABEL:                                    # Day 23b: several linked tables to try for free
+    demo_files = sorted(DEMO_DIR.glob("*.csv"))
+    if not demo_files:
+        st.warning("The demo files are missing. Run: python scripts/build_demo_f1.py <folder with the 14 F1 files>")
+        st.stop()
+    batch = [(p.name, p.read_bytes()) for p in demo_files]
+elif source == "Built-in sample sales data":
     name, data = "sales_sample", SAMPLE_PATH.read_bytes()
 elif source == "Messy test file":
     files = sorted(MESSY_DIR.glob("*.csv"))
@@ -273,45 +286,50 @@ SANDBOX_EXAMPLES = {
 }
 
 with tab_sandbox:
-    st.caption("This is where AI-written code runs (the chat's calculations and the AI dashboard's charts). "
-               "Try the examples, especially the red ones, "
-               "and watch which safety layer stops each attack.")
-    example = st.selectbox("Example code", list(SANDBOX_EXAMPLES))
-    code = st.text_area("Python code (use df, pd, np, px, go; put the answer in `result` or a Plotly figure in `fig`)",
-                        value=SANDBOX_EXAMPLES[example], height=180, key=f"sandbox_code_{example}")
-    cols = st.columns(3)
-    timeout_s = cols[0].number_input("Time limit (seconds)", 2, 60, 5)
-    memory = cols[1].number_input("Memory limit (MB)", 128, 4096, 1024, step=128)
-    skip_check = cols[2].checkbox("Skip the static check (tests the inner locks)")
+    if is_hosted():                                        # Day 23a: no box where visitors type their own Python
+        st.info("The code sandbox tab is switched off on the public demo. The chat and the AI dashboard still run "
+                "their AI-written code in the same locked-down sandbox.")
+    else:
+        st.caption("This is where AI-written code runs (the chat's calculations and the AI dashboard's charts). "
+                   "Try the examples, especially the red ones, "
+                   "and watch which safety layer stops each attack.")
+        example = st.selectbox("Example code", list(SANDBOX_EXAMPLES))
+        code = st.text_area("Python code (use df, pd, np, px, go; put the answer in `result` or a Plotly figure in `fig`)",
+                            value=SANDBOX_EXAMPLES[example], height=180, key=f"sandbox_code_{example}")
+        cols = st.columns(3)
+        timeout_s = cols[0].number_input("Time limit (seconds)", 2, 60, 5)
+        memory = cols[1].number_input("Memory limit (MB)", 128, 4096, 1024, step=128)
+        skip_check = cols[2].checkbox("Skip the static check (tests the inner locks)")
 
-    if st.button("▶ Run in sandbox", type="primary"):
-        tables_for_run = {n: t["df"] for n, t in st.session_state["tables"].items()}
-        with st.spinner("Running..."):
-            res = run_code(code, tables_for_run, active=st.session_state["active_table"],
-                           timeout=int(timeout_s), memory_mb=int(memory), check=not skip_check)
-        if res.ok:
-            st.success(f"Ran successfully in {res.seconds}s")
-        elif res.status == "blocked":
-            st.error("🛑 Blocked before running (static check)")
-        else:
-            st.error(f"❌ {res.status.upper()}: {res.message()}")
-        if res.status == "blocked":
-            for p in res.problems:
-                st.write(f"- {p}")
-        if res.isolation == "none":
-            st.warning("The operating-system file lock (Landlock) is NOT active on this computer. "
-                       "Only the other layers protect you.")
-        elif res.isolation.startswith("landlock"):
-            st.caption(f"File-system lock: active ({res.isolation}) | time: {res.seconds}s")
-        if res.stdout:
-            st.text("Printed output:\n" + res.stdout[:3000])
-        if res.table is not None:
-            st.write(f"Result table ({res.table_total_rows} rows total):")
-            st.dataframe(res.table)
-        elif res.value is not None:
-            st.write("Result:", res.value)
-        if res.figure is not None:
-            st.plotly_chart(res.figure, key="sandbox_fig")
+        if st.button("▶ Run in sandbox", type="primary"):
+            tables_for_run = {n: t["df"] for n, t in st.session_state["tables"].items()}
+            with st.spinner("Running..."):
+                res = run_code(code, tables_for_run, active=st.session_state["active_table"],
+                               timeout=int(timeout_s), memory_mb=int(memory), check=not skip_check)
+            if res.ok:
+                st.success(f"Ran successfully in {res.seconds}s")
+            elif res.status == "blocked":
+                st.error("🛑 Blocked before running (static check)")
+            else:
+                st.error(f"❌ {res.status.upper()}: {res.message()}")
+            if res.status == "blocked":
+                for p in res.problems:
+                    st.write(f"- {p}")
+            if res.isolation == "none":
+                st.warning("The operating-system file lock (Landlock) is NOT active on this computer. "
+                           "Only the other layers protect you.")
+            elif res.isolation.startswith("landlock"):
+                st.caption(f"File-system lock: active ({res.isolation}) | time: {res.seconds}s")
+            if res.stdout:
+                st.text("Printed output:\n" + res.stdout[:3000])
+            if res.table is not None:
+                st.write(f"Result table ({res.table_total_rows} rows total):")
+                st.dataframe(res.table)
+            elif res.value is not None:
+                st.write("Result:", res.value)
+            if res.figure is not None:
+                st.plotly_chart(res.figure, key="sandbox_fig")
+
 
 # ============ TAB 5: AI DASHBOARD (plan -> you approve -> build) ============
 with tab_ai:
@@ -326,5 +344,13 @@ with tab_chat:
         multi = build_multi_chat(active, df, {n: t["df"] for n, t in all_tables.items()},
                                  list(st.session_state.get("links_enabled", [])),
                                  origin={active: table["name"]} if active != table["name"] else {})
-    render_chat(profile, data_key=base_key + ("|" + filter_sig if filter_sig else ""), df=df, scope=filter_label,
-                multi=multi)
+    chat_df = df
+    if is_hosted():                                          # Day 23a: AI code runs here only if the file-system lock works
+        _ok, _why = isolation_ok()
+        if not _ok:
+            st.warning(f"Calculations are switched off on this host ({_why}). The chat answers from the data summary only.")
+            chat_df, multi = None, None
+    from evals.f1_eval import DEMO_QUESTIONS
+    demo_starters = DEMO_QUESTIONS if (source == DEMO_LABEL and chat_df is not None and not filter_label) else None
+    render_chat(profile, data_key=base_key + ("|" + filter_sig if filter_sig else ""), df=chat_df, scope=filter_label,
+                multi=multi, starters=demo_starters)
