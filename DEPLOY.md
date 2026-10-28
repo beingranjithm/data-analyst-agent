@@ -24,8 +24,9 @@ pastes **their own** Gemini key, so your key and your quota are never used.
 
 ## Things to check after it is live (these could not be tested before deploying)
 - The sidebar shows "Your Gemini key" and the blue "Public demo" banner.
-- With the sample data, the Chat tab says "locked-down sandbox". If it says "Calculations are switched off on this host", the host does
-  not allow the file-system lock; the chat still works from the summary, but cannot calculate.
+- Result of the first real test on Streamlit Community Cloud: the host does NOT allow the file-system lock, so the Chat tab says
+  "Live calculations are switched off on this host". The saved demo answers still work (recorded code runs); a visitor's own key gets summary-only chat
+  and fixed-rule dashboards. A host with the lock would allow live calculations.
 - Uploading the F1 files stays inside the limits (or shows the friendly size message).
 - Nothing about your own key appears anywhere. Never put your key in the Secrets box.
 
