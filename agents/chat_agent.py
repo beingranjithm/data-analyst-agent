@@ -170,6 +170,36 @@ def scope_note(scope: str) -> str:
             f"these rows: {scope}. Say so when it matters. You know nothing about the other rows.\n\n")
 
 
+# ---------------------------------------------------------------- Day 19: small safety nets
+MAX_PROFILE_LINE = 400
+
+
+def sanitize_profile_text(text: str) -> str:
+    """The data summary contains the person's own values (category names, column names). Before a model sees it:
+    no control characters, no runs of blank lines, and no line longer than MAX_PROFILE_LINE characters, so one odd
+    cell cannot swamp the summary or fake a new section of it. Normal summaries come out unchanged."""
+    text = re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", " ", text.replace("\r\n", "\n").replace("\r", "\n"))
+    lines = [ln if len(ln) <= MAX_PROFILE_LINE else ln[:MAX_PROFILE_LINE] + " ..." for ln in text.split("\n")]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines))
+
+
+_ZERO_TOTAL = re.compile(r"(revenue|total|sum|amount)\s+(is|was|of|equals|comes to)\s+[$€£]?\s?(0(?:\.0+)?|zero)(?!\d|\.\d|\w)")
+_NO_ROWS = re.compile(r"rows_matched\W+0(?:\.0+)?(?!\d|\.\d)")
+ZERO_ASK = ("No rows matched your filter (rows_matched is 0), so there is no total. Rewrite your answer: say plainly "
+            "that nothing matched and what you looked for, and do not quote a total, an average or any figure for it. "
+            "Reply with prose only, no code.")
+
+
+def claims_zero_total(text: str) -> bool:
+    """True when an answer states a total of 0 ('the total revenue is 0.' counts; '0.5' and '0 rows matched' do not)."""
+    return bool(_ZERO_TOTAL.search(text.lower()))
+
+
+def no_rows_matched(results: str) -> bool:
+    """True when a calculation result says rows_matched is 0 (the prompt asks the model to return it with filters)."""
+    return bool(_NO_ROWS.search(results))
+
+
 def profile_text_for_chat(profile: dict) -> str:
     """The normal data summary plus exact missing-value COUNTS (the summary only has percentages).
     Still only summary numbers from the profile, never rows."""
@@ -299,7 +329,7 @@ class ChatSession:
         self.profile = profile
         self.scope = scope
         self.fix_numbers = fix_numbers
-        self.profile_text = scope_note(scope) + profile_text_for_chat(profile)
+        self.profile_text = sanitize_profile_text(scope_note(scope) + profile_text_for_chat(profile))
         self.model = model
         self.tables = tables
         self.instruction = CALC_INSTRUCTION if tables is not None else INSTRUCTION
@@ -424,8 +454,12 @@ class ChatSession:
         except Exception as e:
             return ChatReply(False, error=describe_model_error(e), calculations=calcs)
         results = "\n".join(c.result_text for c in calcs if c.ok)
-        flagged = ungrounded_numbers(text, self.profile_text, q, results)
         corrected = False
+        if self.fix_numbers and calcs and no_rows_matched(results) and claims_zero_total(text):
+            new = await self._second_try(q, steps, text, ZERO_ASK)     # Day 19: "nothing matched, so the total is 0"
+            if new is not None and not claims_zero_total(new):
+                text, corrected = new, True
+        flagged = ungrounded_numbers(text, self.profile_text, q, results)
         if flagged and results and self.fix_numbers:          # Day 18b: one chance to fix a wrongly copied number
             better = await self._fix_numbers(q, steps, text, flagged, results)
             if better is not None:
@@ -433,21 +467,29 @@ class ChatSession:
         self.transcript += [("user", q), ("model", text)]
         return ChatReply(True, text, flagged, calculations=calcs, corrected=corrected)
 
-    async def _fix_numbers(self, q: str, steps: list, text: str, flagged: list, results: str):
-        """Day 18b: the answer has a number that is in neither the RESULT nor the profile (often a digit copied
-        wrongly). Ask the model ONCE to check its numbers against the RESULT and rewrite the answer.
-        Returns (new text, its remaining flagged numbers) only when the rewrite is clearly better, else None.
-        A problem here (quota, network) never costs the person the answer they already have."""
-        ask = ("Your answer contains numbers that are in neither the RESULT nor the profile: " + ", ".join(flagged)
-               + ". A number may have been copied wrongly. Check every number against the RESULT and rewrite your whole "
-               "answer in plain language, copying numbers digit for digit from the RESULT or the profile. "
-               "Reply with prose only, no code.")
+    async def _second_try(self, q: str, steps: list, text: str, ask: str):
+        """Day 19: asks the model ONE more question about its own answer (one extra request). Returns the new answer,
+        or None when there is no usable one (empty, more code, or a model problem such as quota or network): the
+        person then keeps the answer they already have."""
         try:
             new = await self._model_text(ask, self._history() + [_msg("user", q)] + steps
                                          + [_msg("model", text), _msg("user", ask)])
         except Exception:
             return None
         if not new or extract_code(new) is not None:
+            return None
+        return new
+
+    async def _fix_numbers(self, q: str, steps: list, text: str, flagged: list, results: str):
+        """Day 18b: the answer has a number that is in neither the RESULT nor the profile (often a digit copied
+        wrongly). Ask the model ONCE to check its numbers against the RESULT and rewrite the answer.
+        Returns (new text, its remaining flagged numbers) only when the rewrite is clearly better, else None."""
+        ask = ("Your answer contains numbers that are in neither the RESULT nor the profile: " + ", ".join(flagged)
+               + ". A number may have been copied wrongly. Check every number against the RESULT and rewrite your whole "
+               "answer in plain language, copying numbers digit for digit from the RESULT or the profile. "
+               "Reply with prose only, no code.")
+        new = await self._second_try(q, steps, text, ask)
+        if new is None:
             return None
         again = ungrounded_numbers(new, self.profile_text, q, results)
         return (new, again) if len(again) < len(flagged) else None

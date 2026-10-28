@@ -1,8 +1,8 @@
 # Chat accuracy evaluation
 
-date: 2026-10-28 · mode: use · rows: 600 · chat models: gemini-3.5-flash-lite, gemini-3.1-flash-lite, gemini-3.6-flash · questions: 30 asked, 0 skipped · real requests: 2 · replayed: 54
+date: 2026-10-28 · mode: replay · rows: 600 · chat models: gemini-3.5-flash-lite, gemini-3.1-flash-lite, gemini-3.6-flash · questions: 30 asked, 0 skipped · real requests: 0 · replayed: 57
 
-**29 of 30 answered questions fully correct (97%)**, plus 1 with a minor slip (100% counting those).
+**30 of 30 answered questions fully correct (100%)**.
 
 | Category | Asked | Correct | Minor slip | Wrong | No answer / not run |
 |---|---|---|---|---|---|
@@ -11,16 +11,12 @@ date: 2026-10-28 · mode: use · rows: 600 · chat models: gemini-3.5-flash-lite
 | filters | 5 | 5 | 0 | 0 | 0 |
 | time | 5 | 5 | 0 | 0 | 0 |
 | statistics | 3 | 3 | 0 | 0 | 0 |
-| traps | 5 | 4 | 1 | 0 | 0 |
+| traps | 5 | 5 | 0 | 0 | 0 |
 
 - Self-healed (correct after a failed, empty or zero first try): 0
-- Number-copy guard: 2 answer(s) rewritten once after a number check, 2 of them correct afterwards
+- Number-copy guard: 3 answer(s) rewritten once after a number check, 3 of them correct afterwards
 - Calculations run for the answered questions: 24
 - The app's number check flagged 0 of 0 wrong answers, and raised 0 false alarm(s) on correct answers
-
-## Minor slips
-
-- 28. What is the total revenue for the Atlantis region? → 'There are no records for the Atlantis region in the dataset (0 rows matched), so the total revenue is 0.'
 
 ## All questions
 
@@ -53,7 +49,7 @@ date: 2026-10-28 · mode: use · rows: 600 · chat models: gemini-3.5-flash-lite
 | 25 | statistics | What is the correlation between units and revenue? | PASS | 0.4055 |
 | 26 | traps | What is the average customer age? | PASS | no such column: say so, no number |
 | 27 | traps | What was the profit margin? | PASS | no cost or profit column: say so, no number |
-| 28 | traps | What is the total revenue for the Atlantis region? | MINOR | no such region: say so (quoting a zero total is a minor slip) |
+| 28 | traps | What is the total revenue for the Atlantis region? | PASS | no such region: say so (quoting a zero total is a minor slip) |
 | 29 | traps | What will the total revenue be next year? | PASS | a forecast is not in the data: say so, no invented number |
 | 30 | traps | What was the total revenue in 2030? | PASS | no data for 2030: say so (quoting a zero total is a minor slip) |
 

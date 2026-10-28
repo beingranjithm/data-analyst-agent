@@ -1,22 +1,22 @@
 {
   "meta": {
     "date": "2026-10-28",
-    "mode": "use",
+    "mode": "replay",
     "rows": "600",
     "chat models": "gemini-3.5-flash-lite, gemini-3.1-flash-lite, gemini-3.6-flash",
     "questions": "30 asked, 0 skipped",
-    "real requests": 2,
-    "replayed": 54
+    "real requests": 0,
+    "replayed": 57
   },
   "summary": {
     "total": 30,
     "answered": 30,
-    "passed": 29,
-    "minor": 1,
+    "passed": 30,
+    "minor": 0,
     "failed": 0,
     "no_answer": 0,
     "not_run": 0,
-    "strict": 0.9666666666666667,
+    "strict": 1.0,
     "lenient": 1.0,
     "healed": 0,
     "categories": {
@@ -57,14 +57,14 @@
       },
       "traps": {
         "asked": 5,
-        "passed": 4,
-        "minor": 1,
+        "passed": 5,
+        "minor": 0,
         "failed": 0,
         "other": 0
       }
     },
-    "corrected": 2,
-    "corrected_ok": 2,
+    "corrected": 3,
+    "corrected_ok": 3,
     "false_alarms": 0,
     "wrong_flagged": 0,
     "calc_runs": 24
@@ -452,15 +452,13 @@
       "id": 28,
       "category": "traps",
       "question": "What is the total revenue for the Atlantis region?",
-      "status": "MINOR",
-      "reasons": [
-        "it says nothing matched but still quotes a total of 0"
-      ],
+      "status": "PASS",
+      "reasons": [],
       "expected": "no such region: say so (quoting a zero total is a minor slip)",
-      "answer": "There are no records for the Atlantis region in the dataset (0 rows matched), so the total revenue is 0.",
+      "answer": "Nothing matched the Atlantis region, so no total revenue could be calculated.",
       "tries": 1,
       "healed": false,
-      "corrected": false,
+      "corrected": true,
       "ungrounded": [],
       "error": ""
     },

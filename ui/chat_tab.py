@@ -53,7 +53,7 @@ def _show_history(session, notes, calcs, fixed=None):
             if calcs.get(i):
                 _show_calculations(calcs[i])
             if (fixed or {}).get(i):                       # Day 18b
-                st.caption("✓ The first draft of this answer had a number that did not match the calculation, so it "
+                st.caption("✓ The first draft of this answer did not match the calculation, so it "  # Day 19
                            "was rewritten once. Open \"Show the calculation\" to check it.")
             numbers = notes.get(i)
             if numbers:
