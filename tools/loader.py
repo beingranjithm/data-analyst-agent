@@ -10,7 +10,8 @@ import pandas as pd
 ENCODINGS = ("utf-8-sig", "cp1252", "latin-1")
 DELIMITERS = [",", ";", "\t", "|"]
 NA_VALUES = ["", "N/A", "n/a", "NA", "na", "NaN", "nan", "null", "NULL", "Null",
-             "None", "none", "-", "--", "?", "#N/A", "missing", "Missing"]
+             "None", "none", "-", "--", "?", "#N/A", "missing", "Missing",
+             "\\N"]                                 # Day 21: databases (MySQL dumps, the F1 data set) write NULL as \N
 
 
 def _decode(data: bytes):

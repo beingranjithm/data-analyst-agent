@@ -18,6 +18,8 @@ from ui.chat_tab import render_chat  # noqa: E402
 from ui.dashboard_tab import render_ai_dashboard  # noqa: E402
 from ui.filter_panel import render_filter_panel  # noqa: E402
 from ui.kpi_card import show_kpi  # noqa: E402  (Day 20)
+from tools.multi import build_table  # noqa: E402  (Day 21: shared with the several-files path)
+from ui.multi_panel import render_multi  # noqa: E402  (Day 21)
 
 st.set_page_config(page_title="Agentic Data Analyst", page_icon="📊", layout="wide")
 
@@ -41,18 +43,6 @@ CHART_TYPES = {
 }
 
 
-def build_table(name, data: bytes):
-    """Load -> clean -> profile. Returns a dict describing one table."""
-    df, load_notes = load_csv_bytes(data)
-    df, clean_log = clean_dataframe(df)
-    return {
-        "name": name,
-        "df": df,
-        "profile": profile_dataframe(df),
-        "cleaning_log": load_notes + clean_log,
-    }
-
-
 def show_chart(df, spec, key):
     """Draw one chart, or a friendly message if it cannot be built."""
     try:
@@ -68,7 +58,7 @@ st.caption("Upload a CSV, or pick a built-in file. The '✨ AI dashboard' tab pl
 
 # ---- choose the data source ----
 source = st.sidebar.radio("Data source", ["Upload my own CSV", "Built-in sample sales data", "Messy test file"])
-name, data = None, None
+name, data, batch = None, None, None
 
 if source == "Built-in sample sales data":
     name, data = "sales_sample", SAMPLE_PATH.read_bytes()
@@ -80,33 +70,49 @@ elif source == "Messy test file":
     pick = st.sidebar.selectbox("Pick a file", [f.name for f in files])
     name, data = Path(pick).stem, (MESSY_DIR / pick).read_bytes()
 else:
-    uploaded = st.file_uploader("Upload a CSV file", type=["csv"])
-    if uploaded is not None:
-        if uploaded.size > MAX_MB * 1024 * 1024:
-            st.error(f"File is larger than {MAX_MB} MB. Please upload a smaller file.")
+    uploaded = st.file_uploader("Upload one CSV file, or several files that belong together", type=["csv"],
+                                accept_multiple_files=True)          # Day 21: several files = several linked tables
+    for up in uploaded or []:
+        if up.size > MAX_MB * 1024 * 1024:
+            st.error(f"{up.name} is larger than {MAX_MB} MB. Please upload a smaller file.")
             st.stop()
-        name, data = Path(uploaded.name).stem, uploaded.getvalue()
+    if uploaded and len(uploaded) == 1:
+        name, data = Path(uploaded[0].name).stem, uploaded[0].getvalue()
+    elif uploaded:
+        batch = [(up.name, up.getvalue()) for up in uploaded]
 
-if data is None:
-    st.info("Upload a CSV above, or choose a built-in file in the sidebar.")
+if data is None and batch is None:
+    st.info("Upload a CSV above (or several that belong together), or choose a built-in file in the sidebar.")
     st.stop()
 
-try:
-    table = build_table(name, data)
-except ValueError as e:
-    st.error(str(e))
-    st.stop()
-except Exception as e:
-    st.error(f"Something unexpected went wrong while reading the file: {e}")
-    st.stop()
+flat = None
+if batch is not None:                                  # Day 21: several files
+    table, multi_key, all_tables, flat = render_multi(batch)
+    data = multi_key.encode()
+else:
+    try:
+        table = build_table(name, data)
+    except ValueError as e:
+        st.error(str(e))
+        st.stop()
+    except Exception as e:
+        st.error(f"Something unexpected went wrong while reading the file: {e}")
+        st.stop()
+    all_tables = {table["name"]: table}
 
-# Data is kept as a NAMED COLLECTION of tables (only one for now).
-st.session_state["tables"] = {table["name"]: table}
-st.session_state["active_table"] = table["name"]
+# Data is kept as a NAMED COLLECTION of tables. With several files: every table, plus the analysed one with its
+# linked columns added (named <table>_flat), which is the active table.
+if flat is not None and flat.joined:
+    st.session_state["tables"] = {**all_tables, f"{table['name']}_flat": table}
+    st.session_state["active_table"] = f"{table['name']}_flat"
+else:
+    st.session_state["tables"] = all_tables
+    st.session_state["active_table"] = table["name"]
 
 df, profile = table["df"], table["profile"]
 d = profile["dataset"]
-st.subheader(f"Table: {table['name']}")
+st.subheader(f"Table: {table['name']}" + (f" (with columns from {', '.join(l.parent for l, _ in flat.joined)})"
+                                          if flat is not None and flat.joined else ""))
 
 # Day 17: sidebar filters. The Overview and the Code sandbox always use all rows; the other tabs use the slice.
 base_key = f"{table['name']}:{hashlib.sha1(data).hexdigest()[:12]}"

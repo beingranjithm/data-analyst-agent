@@ -1,0 +1,968 @@
+"""Robust CSV loading: guesses text encoding and delimiter, tidies headers."""
+from __future__ import annotations
+
+import io
+import re
+import statistics
+
+import pandas as pd
+
+ENCODINGS = ("utf-8-sig", "cp1252", "latin-1")
+DELIMITERS = [",", ";", "\t", "|"]
+NA_VALUES = ["", "N/A", "n/a", "NA", "na", "NaN", "nan", "null", "NULL", "Null",
+             "None", "none", "-", "--", "?", "#N/A", "missing", "Missing"]
+
+
+def _decode(data: bytes):
+    for enc in ENCODINGS:
+        try:
+            return data.decode(enc), enc
+        except UnicodeDecodeError:
+            continue
+    return data.decode("latin-1", errors="replace"), "latin-1"
+
+
+def _guess_delimiter(text: str) -> str:
+    """Pick the delimiter that appears a consistent number of times per line."""
+    lines = [ln for ln in text.splitlines()[:30] if ln.strip()]
+    if not lines:
+        return ","
+    best, best_score = ",", 0.0
+    for d in DELIMITERS:
+        counts = [ln.count(d) for ln in lines]
+        med = statistics.median(counts)
+        if med == 0:
+            continue
+        consistency = sum(c == med for c in counts) / len(counts)
+        score = consistency * 10 + min(med, 10) / 10
+        if score > best_score:
+            best, best_score = d, score
+    return best
+
+
+def clean_column_names(columns):
+    """Strip spaces, fill blank names, make names unique. Returns (names, notes)."""
+    names, notes, seen = [], [], {}
+    for i, raw in enumerate(columns, start=1):
+        original = "" if raw is None else str(raw)
+        name = re.sub(r"\s+", " ", original).strip()
+        if name == "" or re.fullmatch(r"Unnamed: \d+(_level_\d+)?", name):
+            name = f"column_{i}"
+        base = name
+        if base in seen:
+            seen[base] += 1
+            name = f"{base}_{seen[base]}"
+        else:
+            seen[base] = 1
+        if name != original:
+            notes.append(f"Column name {original!r} renamed to {name!r}")
+        names.append(name)
+    return names, notes
+
+
+def load_csv_bytes(data: bytes):
+    """Read CSV bytes into a DataFrame. Returns (df, notes). Raises ValueError if unusable."""
+    if not data or not data.strip():
+        raise ValueError("This file is empty. Please upload a CSV that contains data.")
+    text, encoding = _decode(data)
+    delimiter = _guess_delimiter(text)
+    notes = []
+    if encoding != "utf-8-sig":
+        notes.append(f"File was not UTF-8; read as {encoding}")
+    if delimiter != ",":
+        notes.append(f"Detected delimiter {delimiter!r} instead of a comma")
+
+    try:
+        df = pd.read_csv(
+            io.StringIO(text),
+            sep=delimiter,
+            decimal="," if delimiter == ";" else ".",
+            na_values=NA_VALUES,
+            skipinitialspace=True,
+            on_bad_lines="skip",
+            engine="python",
+        )
+    except pd.errors.EmptyDataError:
+        raise ValueError("This file is empty. Please upload a CSV that contains data.")
+    except pd.errors.ParserError as e:
+        raise ValueError(f"This does not look like a valid CSV file ({e}).")
+
+    if df.shape[1] == 0:
+        raise ValueError("No columns were found in this file.")
+
+    df = df.dropna(how="all")
+    if len(df) == 0:
+        raise ValueError("This file has column headers but no data rows.")
+
+    names, rename_notes = clean_column_names(df.columns)
+    df.columns = names
+    notes.extend(rename_notes)
+    return df.reset_index(drop=True), notes
+"""Turns text columns into real dates and numbers so later code can use them."""
+from __future__ import annotations
+
+import pandas as pd
+from pandas.api import types as pdt
+
+from tools.profiler import _as_numeric_text, _detect_dates, _guess_dayfirst
+
+
+def clean_dataframe(df: pd.DataFrame):
+    """Return (cleaned copy, log of what was changed)."""
+    df = df.copy()
+    log = []
+    for i in range(df.shape[1]):
+        s = df.iloc[:, i]
+        name = str(df.columns[i])
+        if pdt.is_numeric_dtype(s) or pdt.is_bool_dtype(s) or pdt.is_datetime64_any_dtype(s):
+            continue
+        s = s.astype("object").where(s.notna(), None)
+        s = s.map(lambda v: v.strip() if isinstance(v, str) else v)
+        s = s.map(lambda v: None if v == "" else v)
+        df.isetitem(i, s)
+
+        parsed = _detect_dates(s)
+        if parsed is not None:
+            text = s.dropna().astype(str)
+            order = "day-first" if _guess_dayfirst(text) else "month-first"
+            df.isetitem(i, parsed.reindex(s.index))
+            log.append(f"{name}: text converted to dates ({order} where ambiguous)")
+            continue
+
+        numeric = _as_numeric_text(s)
+        if numeric is not None:
+            had_percent = s.dropna().astype(str).str.contains("%").any()
+            df.isetitem(i, numeric)
+            extra = "; percent signs removed (values are in percent)" if had_percent else ""
+            log.append(f"{name}: text converted to numbers{extra}")
+    return df, log
+"""Data profiler: turns a DataFrame into a compact, JSON-friendly report.
+
+The AI agents read this report instead of the raw data. That keeps costs low
+and avoids sending a whole file to a model.
+"""
+from __future__ import annotations
+
+import re
+import warnings
+
+import numpy as np
+import pandas as pd
+from pandas.api import types as pdt
+
+ID_HINTS = {"id", "key", "uuid", "guid", "code", "no", "number", "num"}
+TIME_HINTS = ("date", "time", "day", "month", "year", "created", "updated", "order")
+BOOL_WORDS = {"yes", "no", "true", "false", "y", "n", "t", "f"}
+
+
+# ---------- small helpers ----------
+
+def _py(x):
+    """Convert numpy/pandas values to plain Python (None for missing)."""
+    if x is None:
+        return None
+    if isinstance(x, (bool, np.bool_)):
+        return bool(x)
+    if isinstance(x, (pd.Timestamp, np.datetime64)):
+        return None if pd.isna(x) else pd.Timestamp(x).strftime("%Y-%m-%d")
+    if isinstance(x, (int, np.integer)):
+        return int(x)
+    if isinstance(x, (float, np.floating)):
+        return None if (np.isnan(x) or np.isinf(x)) else float(x)
+    return str(x)
+
+
+def _r(x, digits=4):
+    """Round a number safely."""
+    if x is None or pd.isna(x):
+        return None
+    return _py(round(float(x), digits))
+
+
+def _name_tokens(name):
+    spaced = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", name)
+    return {t for t in re.split(r"[^a-z0-9]+", spaced.lower()) if t}
+
+
+def _top_values(non_null, k=5):
+    counts = non_null.astype(str).value_counts().head(k)
+    total = len(non_null)
+    return [
+        {"value": str(v), "count": int(c), "pct": round(100 * c / total, 1)}
+        for v, c in counts.items()
+    ]
+
+
+# ---------- type detection ----------
+
+_NUMERIC_DATE = re.compile(r"^\s*(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})\s*$")
+_ISO_START = r"^\s*\d{4}[-/.]\d{1,2}[-/.]\d{1,2}"
+
+
+def _guess_dayfirst(text):
+    """True if values like 25/12/2024 show the day comes first."""
+    first_big = second_big = False
+    for v in text.astype(str).head(2000):
+        m = _NUMERIC_DATE.match(v)
+        if m:
+            first_big |= int(m.group(1)) > 12
+            second_big |= int(m.group(2)) > 12
+    return first_big and not second_big
+
+
+def _to_datetime(series, dayfirst, mixed):
+    """Parse dates. Year-first (ISO) values are never treated as day-first."""
+    kwargs = {"format": "mixed"} if mixed else {}
+    if not dayfirst:
+        return pd.to_datetime(series, errors="coerce", **kwargs)
+    iso = series.astype(str).str.match(_ISO_START)
+    parsed_iso = pd.to_datetime(series.where(iso), errors="coerce", **kwargs)
+    parsed_rest = pd.to_datetime(series.where(~iso), errors="coerce", dayfirst=True, **kwargs)
+    return parsed_iso.fillna(parsed_rest)
+
+
+def _parse_dates(series):
+    """Parse a text Series as dates. Return None if fewer than 90% parse."""
+    needed = 0.9 * series.notna().sum()
+    dayfirst = _guess_dayfirst(series.dropna())
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        parsed = _to_datetime(series, dayfirst, mixed=False)
+        if parsed.notna().sum() < needed:
+            parsed = _to_datetime(series, dayfirst, mixed=True)
+    return parsed if parsed.notna().sum() >= needed else None
+
+
+def _detect_dates(s):
+    """If a text column looks like dates, return it parsed; otherwise None."""
+    text = s.dropna().astype(str).str.strip()
+    text = text[text != ""]
+    if len(text) < 5:
+        return None
+    sample = text.sample(min(200, len(text)), random_state=0)
+    if pd.to_numeric(sample, errors="coerce").notna().mean() > 0.5:
+        return None  # plain numbers are not dates
+    if sample.str.contains(r"\d").mean() < 0.9:
+        return None  # dates contain digits
+    if _parse_dates(sample) is None:
+        return None
+    return _parse_dates(text)
+
+
+def _as_numeric_text(s):
+    """If a text column holds numbers like '1,200' or '$75', convert it."""
+    cleaned = s.astype(str).str.strip().str.replace(r"[,$€£%\s]", "", regex=True)
+    nums = pd.to_numeric(cleaned, errors="coerce")
+    nums[s.isna()] = np.nan
+    rate = nums.notna().sum() / max(s.notna().sum(), 1)
+    return nums if rate >= 0.95 else None
+
+
+def _date_stats(parsed):
+    lo, hi = parsed.min(), parsed.max()
+    return {"min": _py(lo), "max": _py(hi), "span_days": int((hi - lo).days)}
+
+
+def _numeric_profile(name, values, info):
+    """Fill numeric stats into info. Return the role: numeric, id or empty."""
+    v = values.replace([np.inf, -np.inf], np.nan).dropna().astype("float64")
+    if v.empty:
+        return "empty"
+    q1, med, q3 = v.quantile([0.25, 0.5, 0.75]).tolist()
+    iqr = q3 - q1
+    outliers = int(((v < q1 - 1.5 * iqr) | (v > q3 + 1.5 * iqr)).sum()) if iqr > 0 else 0
+    is_int = bool((v % 1 == 0).all())
+    info.update({
+        "min": _r(v.min()), "max": _r(v.max()), "mean": _r(v.mean()),
+        "median": _r(med), "std": _r(v.std()), "q1": _r(q1), "q3": _r(q3),
+        "zeros": int((v == 0).sum()), "negatives": int((v < 0).sum()),
+        "outliers": outliers, "integer_valued": is_int,
+    })
+    ratio = v.nunique() / len(v)
+    looks_like_id = bool(_name_tokens(name) & ID_HINTS) or v.is_monotonic_increasing
+    if is_int and len(v) >= 20 and ratio >= 0.98 and looks_like_id:
+        return "id"
+    if is_int and v.nunique() <= 10:
+        info["likely_discrete"] = True
+    return "numeric"
+
+
+# ---------- per-column profile ----------
+
+def _profile_column(name, s, n_rows):
+    non_null = s.dropna()
+    missing = int(s.isna().sum())
+    info = {
+        "name": name,
+        "dtype": str(s.dtype),
+        "missing": missing,
+        "missing_pct": round(100 * missing / n_rows, 1) if n_rows else 0.0,
+        "unique": int(non_null.nunique()),
+    }
+    notes = []
+    numeric_values = None
+
+    if non_null.empty:
+        info["role"] = "empty"
+        notes.append("Column has no data")
+    elif pdt.is_bool_dtype(s):
+        info["role"] = "boolean"
+        info["top_values"] = _top_values(non_null)
+    elif pdt.is_datetime64_any_dtype(s):
+        info["role"] = "datetime"
+        info.update(_date_stats(non_null))
+    elif pdt.is_numeric_dtype(s):
+        numeric_values = pd.to_numeric(s, errors="coerce").astype("float64")
+        info["role"] = _numeric_profile(name, numeric_values, info)
+    else:
+        parsed = _detect_dates(s)
+        as_num = None if parsed is not None else _as_numeric_text(s)
+        if parsed is not None:
+            info["role"] = "datetime"
+            info["parsed_from_text"] = True
+            info.update(_date_stats(parsed.dropna()))
+            notes.append("Stored as text; parsed as dates")
+        elif as_num is not None:
+            numeric_values = as_num
+            info["role"] = _numeric_profile(name, as_num, info)
+            notes.append("Numbers stored as text")
+        else:
+            text = non_null.astype(str)
+            lowered = set(text.str.strip().str.lower().unique())
+            if lowered <= BOOL_WORDS:
+                info["role"] = "boolean"
+                info["top_values"] = _top_values(non_null)
+            else:
+                avg_len = float(text.str.len().mean())
+                ratio = info["unique"] / len(non_null)
+                info["avg_length"] = round(avg_len, 1)
+                if ratio >= 0.98 and len(non_null) >= 20:
+                    info["role"] = "id" if avg_len <= 40 else "text"
+                elif avg_len > 50 and ratio > 0.5:
+                    info["role"] = "text"
+                elif info["unique"] <= max(30, 0.05 * len(non_null)):
+                    info["role"] = "categorical"
+                    info["top_values"] = _top_values(non_null)
+                else:
+                    info["role"] = "high_cardinality"
+                    info["top_values"] = _top_values(non_null)
+                    notes.append(f"Many distinct values ({info['unique']}); hard to chart")
+
+    if info["role"] == "numeric" and numeric_values is not None:
+        v = numeric_values.dropna()
+        if (_name_tokens(name) & {"year", "yr", "fy"} and bool((v % 1 == 0).all())
+                and v.min() >= 1900 and v.max() <= 2100 and v.nunique() <= 60):
+            info["role"] = "categorical"
+            info["top_values"] = _top_values(v.astype(int))
+            notes.append("Year-like column treated as a category, not a measure")
+            numeric_values = None
+
+    if info["unique"] == 1 and info["role"] != "empty":
+        notes.append("Constant column (only one value)")
+    if info["missing_pct"] >= 80:
+        notes.append(f"Almost empty ({info['missing_pct']}% missing)")
+    elif info["missing_pct"] >= 30:
+        notes.append(f"High missing values ({info['missing_pct']}%)")
+    info["notes"] = notes
+    return info, numeric_values
+
+
+# ---------- whole-dataset profile ----------
+
+def profile_dataframe(df):
+    """Profile a DataFrame. Returns a plain dict that is safe to turn into JSON."""
+    n_rows, n_cols = df.shape
+    columns, numeric_frames = [], {}
+
+    for i in range(n_cols):  # by position, so duplicate column names don't break us
+        name = str(df.columns[i])
+        info, numeric_values = _profile_column(name, df.iloc[:, i], n_rows)
+        columns.append(info)
+        if numeric_values is not None and info["role"] == "numeric":
+            numeric_frames[name] = numeric_values
+
+    # time column: prefer names that sound like dates
+    dt_cols = [c["name"] for c in columns if c["role"] == "datetime"]
+    time_column = None
+    if dt_cols:
+        hinted = [n for n in dt_cols if any(h in n.lower() for h in TIME_HINTS)]
+        time_column = (hinted or dt_cols)[0]
+
+    # strong correlations between numeric columns
+    corr_pairs = []
+    if len(numeric_frames) >= 2 and n_rows >= 10:
+        corr = pd.DataFrame(numeric_frames).corr()
+        names = list(corr.columns)
+        for i in range(len(names)):
+            for j in range(i + 1, len(names)):
+                r = corr.iloc[i, j]
+                if pd.notna(r) and abs(r) >= 0.5:
+                    corr_pairs.append({"a": names[i], "b": names[j], "r": round(float(r), 3)})
+        corr_pairs.sort(key=lambda x: abs(x["r"]), reverse=True)
+        corr_pairs = corr_pairs[:10]
+
+    # warnings
+    warns = []
+    duplicates = int(df.duplicated().sum()) if n_cols else 0
+    if n_rows and n_rows < 30:
+        warns.append(f"Very small dataset ({n_rows} rows); charts may not be meaningful")
+    if n_cols > 50:
+        warns.append(f"Very wide dataset ({n_cols} columns); only the most useful will be charted")
+    if duplicates:
+        warns.append(f"{duplicates} duplicate rows")
+    if len(set(df.columns)) != n_cols:
+        warns.append("Duplicate column names found")
+    for c in columns:
+        for note in c["notes"]:
+            warns.append(f"{c['name']}: {note}")
+
+    cells = n_rows * n_cols
+    missing_cells = int(df.isna().sum().sum()) if n_cols else 0
+    return {
+        "dataset": {
+            "rows": int(n_rows),
+            "columns": int(n_cols),
+            "duplicate_rows": duplicates,
+            "missing_cells": missing_cells,
+            "missing_pct": round(100 * missing_cells / cells, 2) if cells else 0.0,
+            "memory_mb": round(float(df.memory_usage(deep=True).sum()) / 1e6, 2),
+        },
+        "columns": columns,
+        "time_column": time_column,
+        "measures": [c["name"] for c in columns if c["role"] == "numeric"],
+        "dimensions": [c["name"] for c in columns if c["role"] in ("categorical", "boolean")],
+        "id_columns": [c["name"] for c in columns if c["role"] == "id"],
+        "correlations": corr_pairs,
+        "warnings": warns,
+    }
+
+
+# ---------- human- and AI-readable text ----------
+
+def _fmt(x):
+    if x is None:
+        return "n/a"
+    if isinstance(x, float):
+        return f"{x:,.2f}"
+    return str(x)
+
+
+def describe_column(c):
+    """One short line describing a profiled column."""
+    role = c["role"]
+    if role == "numeric":
+        return f"min {_fmt(c.get('min'))}, median {_fmt(c.get('median'))}, max {_fmt(c.get('max'))}"
+    if role == "datetime":
+        return f"{c.get('min')} to {c.get('max')} ({c.get('span_days')} days)"
+    if role in ("categorical", "boolean", "high_cardinality"):
+        top = c.get("top_values", [])[:3]
+        return ", ".join(f"{t['value']} ({t['pct']}%)" for t in top)
+    if role == "text":
+        return f"free text, average {c.get('avg_length')} characters"
+    if role == "id":
+        return "unique identifier"
+    return "no data"
+
+
+def profile_to_text(profile):
+    """Compact summary that the AI agents will read instead of the raw data."""
+    d = profile["dataset"]
+    lines = [
+        f"Dataset: {d['rows']} rows x {d['columns']} columns; "
+        f"{d['duplicate_rows']} duplicate rows; {d['missing_pct']}% of cells missing."
+    ]
+    if profile["time_column"]:
+        lines.append(f"Time column: {profile['time_column']}")
+    lines.append("Columns:")
+    for c in profile["columns"]:
+        lines.append(f"- {c['name']} [{c['role']}, {c['missing_pct']}% missing]: {describe_column(c)}")
+    if profile["correlations"]:
+        lines.append("Strong correlations:")
+        for p in profile["correlations"]:
+            lines.append(f"- {p['a']} vs {p['b']}: r={p['r']}")
+    if profile["warnings"]:
+        lines.append("Data quality warnings:")
+        for w in profile["warnings"]:
+            lines.append(f"- {w}")
+    return "\n".join(lines)
+"""Runs AI-written Python code safely (as safely as a plain process allows).
+
+Layers of protection:
+  1. Static check     - tools/code_guard.py rejects dangerous code before it runs.
+  2. Separate process - a crash or freeze cannot take down the app.
+  3. Scrubbed secrets - the child process does not receive your API keys.
+  4. Resource limits  - wall-clock timeout, CPU time and memory caps.
+  5. Restricted world - no open(), no network, only allow-listed imports.
+  6. File-system lock - Linux Landlock: the code can only read Python's own folders
+                        and write inside its private temp folder (needs no admin rights).
+
+Honest limit: still not a full container. Docker is added later for stronger isolation.
+"""
+from __future__ import annotations
+
+import json
+import os
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+
+from tools.code_guard import check_code
+
+CHILD_SCRIPT = Path(__file__).with_name("sandbox_child.py")
+DEFAULT_TIMEOUT = 30
+DEFAULT_MEMORY_MB = 1024
+
+
+@dataclass
+class RunResult:
+    status: str  # ok | error | blocked | timeout | killed
+    stdout: str = ""
+    error: dict | None = None
+    problems: list = field(default_factory=list)
+    table: pd.DataFrame | None = None
+    table_total_rows: int | None = None
+    value: Any = None
+    figure_json: str | None = None
+    seconds: float = 0.0
+    debug: str = ""
+    isolation: str = "unknown"  # "landlock-vN" when the file-system lock is active, "none" if not
+
+    @property
+    def ok(self) -> bool:
+        return self.status == "ok"
+
+    @property
+    def figure(self):
+        """The Plotly figure produced by the code (variable `fig`), or None."""
+        if not self.figure_json:
+            return None
+        import plotly.io as pio
+        return pio.from_json(self.figure_json)
+
+    def message(self) -> str:
+        """A short description of what happened (used later to help the AI fix its code)."""
+        if self.status == "ok":
+            return "Code ran successfully."
+        if self.status == "blocked":
+            return "Code was blocked before running: " + "; ".join(self.problems)
+        if self.status == "timeout":
+            return "Code took too long and was stopped (possible infinite loop or very heavy calculation)."
+        if self.status == "killed":
+            return "Code was stopped because it used too much memory or CPU time."
+        e = self.error or {}
+        where = f" (line {e['line']}: {e['code_line']})" if e.get("line") and e.get("code_line") else ""
+        text = f"{e.get('type', 'Error')}: {e['message']}" if e.get("message") else str(e.get("type", "Error"))
+        return text + where
+
+
+def _clean_env(workdir: str) -> dict:
+    """A minimal environment. Nothing from your own environment (API keys!) is passed on."""
+    return {
+        "PATH": "/usr/bin:/bin",
+        "HOME": workdir,
+        "TMPDIR": workdir,
+        "LANG": "C.UTF-8",
+        "PYTHONHASHSEED": "0",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+        "OMP_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1",
+        "NUMEXPR_NUM_THREADS": "1",
+        # Use the normal system allocator so the memory limit works with pandas' Arrow library
+        "ARROW_DEFAULT_MEMORY_POOL": "system",
+    }
+
+
+def run_code(code, tables, *, active=None, timeout=DEFAULT_TIMEOUT,
+             memory_mb=DEFAULT_MEMORY_MB, check=True, require_isolation=False) -> RunResult:
+    """Run `code` against one or more tables.
+
+    Inside the code you can use:  df (the active table), tables (dict of all tables),
+    pd, np, px, go. Put the answer in a variable called `result` and/or a Plotly
+    figure in `fig`.
+    `check=False` skips the static check. Only for testing the inner layers.
+    `require_isolation=True` refuses to run if the file-system lock is unavailable.
+    """
+    if isinstance(tables, pd.DataFrame):
+        tables = {"data": tables}
+    if not tables:
+        return RunResult("error", error={"type": "NoData", "message": "No table was provided.", "line": None, "code_line": None})
+    active = active or next(iter(tables))
+
+    if check:
+        problems = check_code(code)
+        if problems:
+            return RunResult("blocked", problems=problems)
+
+    started = time.time()
+    with tempfile.TemporaryDirectory(prefix="daa_sandbox_") as workdir:
+        entries = []
+        for i, (name, frame) in enumerate(tables.items()):
+            filename = f"table_{i}.pkl"
+            frame.to_pickle(os.path.join(workdir, filename))
+            entries.append({"name": name, "file": filename})
+        Path(workdir, "code.py").write_text(code, encoding="utf-8")
+        Path(workdir, "config.json").write_text(json.dumps({
+            "tables": entries, "active": active, "timeout": timeout, "memory_mb": memory_mb,
+            "require_isolation": require_isolation,
+        }))
+
+        proc = subprocess.Popen(
+            [sys.executable, "-I", str(CHILD_SCRIPT), workdir],
+            cwd=workdir, env=_clean_env(workdir),
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            start_new_session=True, close_fds=True, text=True,
+        )
+        try:
+            _, stderr = proc.communicate(timeout=timeout)
+            timed_out = False
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            _, stderr = proc.communicate()
+
+        seconds = round(time.time() - started, 2)
+        debug = (stderr or "")[-1500:]
+        if timed_out:
+            return RunResult("timeout", seconds=seconds, debug=debug)
+
+        result_file = Path(workdir, "result.json")
+        if proc.returncode != 0 or not result_file.exists():
+            return RunResult("killed", seconds=seconds, debug=debug)
+
+        payload = json.loads(result_file.read_text(encoding="utf-8"))
+
+    table = None
+    if "table" in payload:
+        t = payload["table"]
+        table = pd.DataFrame(t["data"], columns=t["columns"])
+    return RunResult(
+        status="error" if payload.get("error") else "ok",
+        stdout=payload.get("stdout", ""),
+        error=payload.get("error"),
+        table=table,
+        table_total_rows=payload.get("table", {}).get("total_rows"),
+        value=payload.get("value"),
+        figure_json=payload.get("figure_json"),
+        seconds=seconds,
+        debug=debug,
+        isolation=payload.get("isolation", "none"),
+    )
+"""Hand-built chart library with simple, explainable rules.
+
+These functions are the reference for what a "good" chart looks like.
+Later, the AI planner will follow the same rules (see CHART_RULES).
+A chart is described by a small dict called a "spec", for example:
+    {"type": "bar", "dimension": "region", "measure": "revenue", "agg": "sum"}
+"""
+from __future__ import annotations
+
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+
+PALETTE = ["#4C78A8", "#F58518", "#54A24B", "#E45756", "#72B7B2",
+           "#B279A2", "#FF9DA6", "#9D755D", "#BAB0AC", "#EECA3B"]
+MEAN_HINTS = {"price", "rate", "ratio", "pct", "percent", "percentage", "score", "avg",
+              "average", "mean", "discount", "age", "temp", "temperature", "growth",
+              "margin", "rating", "share"}
+PRIMARY_HINTS = ("revenue", "sales", "amount", "total", "profit", "cost", "income",
+                 "units", "quantity", "qty", "count", "price", "value")
+AGG_FUNCS = {"sum": "sum", "mean": "mean", "median": "median", "count": "count",
+             "min": "min", "max": "max"}
+MAX_BARS = 10
+
+CHART_RULES = """\
+Chart selection rules (the AI planner will follow these):
+- Trend over time: line chart of one measure by a time column, aggregated by day, week, month, quarter or year depending on the time span.
+- Compare categories: horizontal bar chart of a measure by one category column; show the top 10 and group the rest as 'Other'.
+- Share of a whole: donut chart only when a category has 6 or fewer values.
+- Distribution of one number: histogram.
+- Spread of a number across categories: box plot.
+- Relationship between two numbers: scatter plot; add colour only for a category with 8 or fewer values.
+- Overview of many numbers: correlation heatmap when there are 3 or more measures.
+- Sum amounts (revenue, units); average rates, prices, scores and percentages.
+- Never chart identifier or free-text columns. Always say how many rows were left out because of missing values.
+"""
+
+
+class ChartError(ValueError):
+    """Raised with a friendly message when a chart cannot be built."""
+
+
+# ---------- helpers ----------
+
+def default_agg(measure: str) -> str:
+    """Amounts are summed; rates, prices and scores are averaged."""
+    tokens = set(measure.lower().replace("-", "_").replace(" ", "_").split("_"))
+    return "mean" if tokens & MEAN_HINTS else "sum"
+
+
+def pick_primary_measure(profile: dict):
+    measures = profile.get("measures", [])
+    if not measures:
+        return None
+    for hint in PRIMARY_HINTS:
+        for m in measures:
+            if hint in m.lower():
+                return m
+    return measures[0]
+
+
+def _need(df, *cols):
+    for c in cols:
+        if c is not None and c not in df.columns:
+            raise ChartError(f"Column '{c}' does not exist in this table.")
+
+
+def _need_numeric(df, col):
+    if not pd.api.types.is_numeric_dtype(df[col]):
+        raise ChartError(f"Column '{col}' is not numeric, so it cannot be used as a measure.")
+
+
+def _need_datetime(df, col):
+    if not pd.api.types.is_datetime64_any_dtype(df[col]):
+        raise ChartError(f"Column '{col}' is not a date column.")
+
+
+def _style(fig, title, note=None):
+    fig.update_layout(
+        template="plotly_white", title=dict(text=title, x=0.01, xanchor="left"),
+        colorway=PALETTE, margin=dict(l=40, r=20, t=60, b=60 if note else 40),
+        height=380, legend_title_text="",
+    )
+    if note:
+        fig.add_annotation(text=note, xref="paper", yref="paper", x=0, y=-0.18,
+                           showarrow=False, font=dict(size=11, color="#888"), xanchor="left")
+    return fig
+
+
+def _excluded_note(n_excluded, what):
+    return f"Excludes {n_excluded:,} rows with missing {what}" if n_excluded else None
+
+
+def pick_frequency(span_days: int):
+    """(pandas frequency code, label) based on how long the data spans."""
+    if span_days <= 60:
+        return "D", "daily"
+    if span_days <= 400:
+        return "MS", "monthly"
+    if span_days <= 365 * 6:
+        return "QS", "quarterly"
+    return "YS", "yearly"
+
+
+# ---------- chart builders ----------
+
+def trend_chart(df, time, measure, agg=None):
+    _need(df, time, measure); _need_datetime(df, time); _need_numeric(df, measure)
+    agg = agg or default_agg(measure)
+    data = df[[time, measure]].dropna(subset=[time])
+    if data.empty:
+        raise ChartError(f"No valid dates in '{time}'.")
+    span = int((data[time].max() - data[time].min()).days)
+    freq, label = pick_frequency(span)
+    series = data.set_index(time)[measure].resample(freq).agg(AGG_FUNCS[agg]).reset_index()
+    fig = px.line(series, x=time, y=measure, markers=True)
+    fig.update_traces(line=dict(width=2.5))
+    note = _excluded_note(int(df[time].isna().sum()), f"'{time}'")
+    return _style(fig, f"{agg.title()} of {measure} ({label})", note)
+
+
+def bar_chart(df, dimension, measure, agg=None, top_n=MAX_BARS):
+    _need(df, dimension, measure); _need_numeric(df, measure)
+    agg = agg or default_agg(measure)
+    data = df[[dimension, measure]].dropna(subset=[dimension])
+    grouped = data.groupby(dimension)[measure].agg(AGG_FUNCS[agg]).sort_values(ascending=False)
+    if grouped.empty:
+        raise ChartError(f"No data to chart for '{dimension}'.")
+    if len(grouped) > top_n and agg in ("sum", "count"):
+        other = grouped.iloc[top_n:].sum()
+        grouped = pd.concat([grouped.iloc[:top_n], pd.Series({"Other": other})])
+    elif len(grouped) > top_n:
+        grouped = grouped.iloc[:top_n]
+    plot = grouped.sort_values().reset_index()
+    plot.columns = [dimension, measure]
+    fig = px.bar(plot, x=measure, y=dimension, orientation="h")
+    note = _excluded_note(int(df[dimension].isna().sum()), f"'{dimension}'")
+    return _style(fig, f"{agg.title()} of {measure} by {dimension}", note)
+
+
+def donut_chart(df, dimension, measure, agg=None):
+    _need(df, dimension, measure); _need_numeric(df, measure)
+    agg = agg or default_agg(measure)
+    if agg not in ("sum", "count"):
+        raise ChartError("A share-of-total chart needs a summed or counted measure.")
+    data = df[[dimension, measure]].dropna(subset=[dimension])
+    grouped = data.groupby(dimension)[measure].agg(AGG_FUNCS[agg])
+    grouped = grouped[grouped > 0]
+    if len(grouped) < 2:
+        raise ChartError(f"'{dimension}' needs at least 2 values for a share chart.")
+    fig = go.Figure(go.Pie(labels=grouped.index.astype(str), values=grouped.values, hole=0.5))
+    note = _excluded_note(int(df[dimension].isna().sum()), f"'{dimension}'")
+    return _style(fig, f"Share of {measure} by {dimension}", note)
+
+
+def histogram_chart(df, measure, bins=30):
+    _need(df, measure); _need_numeric(df, measure)
+    data = df[[measure]].dropna()
+    if data.empty:
+        raise ChartError(f"No values in '{measure}'.")
+    fig = px.histogram(data, x=measure, nbins=bins)
+    note = _excluded_note(int(df[measure].isna().sum()), f"'{measure}'")
+    return _style(fig, f"Distribution of {measure}", note)
+
+
+def box_chart(df, dimension, measure, top_n=MAX_BARS):
+    _need(df, dimension, measure); _need_numeric(df, measure)
+    data = df[[dimension, measure]].dropna()
+    keep = data[dimension].value_counts().head(top_n).index
+    data = data[data[dimension].isin(keep)]
+    if data.empty:
+        raise ChartError("No data to chart.")
+    fig = px.box(data, x=dimension, y=measure)
+    return _style(fig, f"{measure} by {dimension}")
+
+
+def scatter_chart(df, x, y, color=None):
+    _need(df, x, y, color); _need_numeric(df, x); _need_numeric(df, y)
+    cols = [c for c in (x, y, color) if c]
+    data = df[cols].dropna()
+    if len(data) > 5000:
+        data = data.sample(5000, random_state=0)
+    if data.empty:
+        raise ChartError("No complete rows to plot.")
+    fig = px.scatter(data, x=x, y=y, color=color, opacity=0.7)
+    return _style(fig, f"{y} vs {x}")
+
+
+def heatmap_chart(df, measures):
+    _need(df, *measures)
+    for m in measures:
+        _need_numeric(df, m)
+    if len(measures) < 2:
+        raise ChartError("A correlation heatmap needs at least 2 numeric columns.")
+    corr = df[measures].corr()
+    fig = px.imshow(corr, text_auto=".2f", zmin=-1, zmax=1, color_continuous_scale="RdBu_r", aspect="auto")
+    return _style(fig, "Correlation between numeric columns")
+
+
+BUILDERS = {
+    "line": lambda df, s: trend_chart(df, s["time"], s["measure"], s.get("agg")),
+    "bar": lambda df, s: bar_chart(df, s["dimension"], s["measure"], s.get("agg")),
+    "donut": lambda df, s: donut_chart(df, s["dimension"], s["measure"], s.get("agg")),
+    "histogram": lambda df, s: histogram_chart(df, s["measure"]),
+    "box": lambda df, s: box_chart(df, s["dimension"], s["measure"]),
+    "scatter": lambda df, s: scatter_chart(df, s["x"], s["y"], s.get("color")),
+    "heatmap": lambda df, s: heatmap_chart(df, s["measures"]),
+}
+
+
+def build_chart(df: pd.DataFrame, spec: dict) -> go.Figure:
+    """Build a Plotly figure from a spec dict. Raises ChartError with a friendly message."""
+    kind = spec.get("type")
+    if kind not in BUILDERS:
+        raise ChartError(f"Unknown chart type '{kind}'. Choose from: {', '.join(BUILDERS)}.")
+    try:
+        return BUILDERS[kind](df, spec)
+    except KeyError as e:
+        raise ChartError(f"The chart spec is missing {e}.")
+
+
+# ---------- rule-based chart suggestions ----------
+
+def _usable_dimensions(profile, max_unique=15):
+    cols = {c["name"]: c for c in profile["columns"]}
+    dims = [cols[n] for n in profile["dimensions"] if 2 <= cols[n]["unique"] <= max_unique]
+    return [d["name"] for d in sorted(dims, key=lambda d: (d["missing_pct"], d["unique"]))]
+
+
+def suggest_charts(profile: dict, max_charts: int = 8):
+    """Apply CHART_RULES to a profile. Returns a list of specs with a 'why' explanation."""
+    specs = []
+    cols = {c["name"]: c for c in profile["columns"]}
+    primary = pick_primary_measure(profile)
+    dims = _usable_dimensions(profile)
+    measures = profile["measures"]
+    time = profile["time_column"]
+
+    if time and primary:
+        specs.append({"type": "line", "time": time, "measure": primary,
+                      "why": f"Shows how {primary} changes over time."})
+    for dim in dims[:2]:
+        if primary:
+            specs.append({"type": "bar", "dimension": dim, "measure": primary,
+                          "why": f"Compares {primary} across {dim}."})
+    for dim in dims:
+        if primary and cols[dim]["unique"] <= 6 and default_agg(primary) == "sum":
+            specs.append({"type": "donut", "dimension": dim, "measure": primary,
+                          "why": f"Shows each {dim}'s share of total {primary}."})
+            break
+    if primary:
+        specs.append({"type": "histogram", "measure": primary,
+                      "why": f"Shows the typical size and spread of {primary}."})
+    if len(measures) >= 2 and profile["correlations"]:
+        top = profile["correlations"][0]
+        color = next((d for d in dims if cols[d]["unique"] <= 8), None)
+        specs.append({"type": "scatter", "x": top["a"], "y": top["b"], "color": color,
+                      "why": f"{top['a']} and {top['b']} move together (r={top['r']})."})
+    if len(measures) >= 3:
+        specs.append({"type": "heatmap", "measures": measures[:10],
+                      "why": "Gives an overview of how all numeric columns relate."})
+    if dims and primary:
+        specs.append({"type": "box", "dimension": dims[0], "measure": primary,
+                      "why": f"Shows the spread of {primary} within each {dims[0]}."})
+    return specs[:max_charts]
+
+
+def spec_title(spec: dict) -> str:
+    t = spec["type"]
+    if t == "line":
+        return f"{spec['measure']} over time"
+    if t in ("bar", "donut", "box"):
+        return f"{spec['measure']} by {spec['dimension']}"
+    if t == "histogram":
+        return f"Distribution of {spec['measure']}"
+    if t == "scatter":
+        return f"{spec['y']} vs {spec['x']}"
+    return "Correlation overview"
+
+
+# ---------- KPI cards ----------
+
+def _compact(x):
+    ax = abs(x)
+    for limit, suffix in ((1e9, "B"), (1e6, "M"), (1e3, "K")):
+        if ax >= limit:
+            return f"{x / limit:,.1f}{suffix}"
+    return f"{x:,.2f}" if x % 1 else f"{x:,.0f}"
+
+
+def compute_kpis(df: pd.DataFrame, profile: dict):
+    """A few headline numbers: list of {'label', 'value'}."""
+    kpis = [{"label": "Rows analysed", "value": f"{len(df):,}"}]
+    primary = pick_primary_measure(profile)
+    if primary:
+        agg = default_agg(primary)
+        value = df[primary].sum() if agg == "sum" else df[primary].mean()
+        kpis.append({"label": f"{'Total' if agg == 'sum' else 'Average'} {primary}", "value": _compact(float(value))})
+    if profile["time_column"]:
+        col = df[profile["time_column"]].dropna()
+        if not col.empty:
+            kpis.append({"label": "Period covered", "value": f"{col.min():%Y-%m-%d} to {col.max():%Y-%m-%d}"})
+    dims = _usable_dimensions(profile)
+    if dims and primary:
+        g = df.groupby(dims[0])[primary].agg(AGG_FUNCS[default_agg(primary)])
+        if not g.empty:
+            kpis.append({"label": f"Top {dims[0]}", "value": str(g.idxmax())})
+    return kpis[:4]
