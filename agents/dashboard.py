@@ -20,6 +20,7 @@ from tools.charts import build_chart, suggest_charts
 from tools.figure_checks import check_figure
 from tools.plan_kpis import KpiValue, compute_plan_kpis
 from tools.plan_schema import ChartSpec, DashboardPlan
+from tools.title_check import title_warnings
 
 Progress = Callable[[str, int, int, str], None]   # (stage, done, total, message)
 
@@ -79,7 +80,13 @@ def _finish(fig, chart: ChartSpec):
     check = check_figure(fig)
     if check.ok and check.missing_title:
         fig.update_layout(title_text=chart.title)
-    return fig, check.problems, check.warnings
+    warnings = list(check.warnings)
+    try:                                       # Day 20: does the title say what the chart measures?
+        shown = fig.layout.title.text if fig.layout.title and fig.layout.title.text else chart.title
+        warnings += title_warnings(shown, getattr(chart, "measure", None))
+    except Exception:
+        pass
+    return fig, check.problems, warnings
 
 
 async def make_plan_async(profile: dict, model=DEFAULT_MODEL, *, use_ai: bool = True,

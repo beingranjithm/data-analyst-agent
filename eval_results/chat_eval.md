@@ -1,6 +1,6 @@
 # Chat accuracy evaluation
 
-date: 2026-10-28 · mode: replay · rows: 600 · chat models: gemini-3.5-flash-lite, gemini-3.1-flash-lite, gemini-3.6-flash · questions: 30 asked, 0 skipped · real requests: 0 · replayed: 57
+date: 2026-10-28 · mode: replay · rows: 600 · chat models: gemini-3.5-flash-lite, gemini-3.1-flash-lite, gemini-3.6-flash · questions: 30 asked, 0 skipped · real requests: 0 · replayed: 55
 
 **30 of 30 answered questions fully correct (100%)**.
 
@@ -14,9 +14,15 @@ date: 2026-10-28 · mode: replay · rows: 600 · chat models: gemini-3.5-flash-l
 | traps | 5 | 5 | 0 | 0 | 0 |
 
 - Self-healed (correct after a failed, empty or zero first try): 0
-- Number-copy guard: 3 answer(s) rewritten once after a number check, 3 of them correct afterwards
+- Number-copy guard: 1 answer(s) rewritten once after a number check, 1 of them correct afterwards
 - Calculations run for the answered questions: 24
 - The app's number check flagged 0 of 0 wrong answers, and raised 0 false alarm(s) on correct answers
+
+## Rewritten answers (first draft, then final)
+
+**15. What is the total revenue of the Electronics category in the North region?** (PASS)
+- first draft: 'The total revenue for the Electronics category in the North region is 280,550 across 54 matching rows.'
+- final: 'The total revenue for the Electronics category in the North region is 280,050 across 54 matching rows.'
 
 ## All questions
 

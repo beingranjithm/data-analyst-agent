@@ -147,7 +147,10 @@ def test_the_tab_tells_the_person_when_an_answer_was_rewritten_and_shows_no_warn
     at = tab([EAST_SUM, "East revenue is 408 in total.", "East revenue is 480 in total."])
     at.chat_input[0].set_value("East total?").run()
     assert not at.exception
-    assert any("East revenue is 480" in m.value for m in at.markdown) and not any("408" in m.value for m in at.markdown)
+    drafts = [e for e in at.expander if "first draft" in e.label]       # Day 20: the replaced answer is kept, but only in here
+    assert len(drafts) == 1 and any("408" in m.value for m in drafts[0].markdown)
+    outside = [m.value for m in at.markdown if not any(m is x for x in drafts[0].markdown)]
+    assert any("East revenue is 480" in v for v in outside) and not any("408" in v for v in outside)
     assert "rewritten once" in captions(at) and len(at.warning) == 0
 
 

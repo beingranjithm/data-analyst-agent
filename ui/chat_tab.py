@@ -55,6 +55,10 @@ def _show_history(session, notes, calcs, fixed=None):
             if (fixed or {}).get(i):                       # Day 18b
                 st.caption("✓ The first draft of this answer did not match the calculation, so it "  # Day 19
                            "was rewritten once. Open \"Show the calculation\" to check it.")
+                draft = (fixed or {}).get(i)
+                if isinstance(draft, str) and draft:       # Day 20: show what was replaced
+                    with st.expander("See the first draft (before the check)"):
+                        st.write(draft)
             numbers = notes.get(i)
             if numbers:
                 st.warning("These numbers are not in the data summary, so please double-check them: "
@@ -143,7 +147,7 @@ def render_chat(profile, data_key: str, *, df=None, session_factory: Optional[Ca
             if reply.calculations:
                 calcs[len(session.transcript) - 1] = reply.calculations
             if getattr(reply, "corrected", False):
-                fixed[len(session.transcript) - 1] = True
+                fixed[len(session.transcript) - 1] = getattr(reply, "first_draft", "") or True
         else:
             ss["chat_error"] = reply.error
         ss["chat_kept"] = list(session.transcript)

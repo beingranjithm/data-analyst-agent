@@ -117,6 +117,7 @@ class ChatReply:
     error: Optional[str] = None
     calculations: list = field(default_factory=list)  # list of Calculation (empty when none was needed)
     corrected: bool = False                           # Day 18b: a wrong number was found and the answer rewritten once
+    first_draft: str = ""                             # Day 20: the answer that was replaced (empty when none was)
 
 
 # ---------------------------------------------------------------- honesty check
@@ -234,6 +235,26 @@ def starter_questions(profile: dict) -> list:
 
 
 # ---------------------------------------------------------------- calculation results (what the model may see)
+def _plain_number(x, blank_nan: bool = False) -> str:
+    """Day 20: 126.0 -> '126', 12.5 -> '12.5' (what a person would write). Anything else as text."""
+    if isinstance(x, numbers.Real) and not isinstance(x, bool):
+        f = float(x)
+        if f != f:
+            return "" if blank_nan else str(x)
+        if f.is_integer() and abs(f) < 1e15:
+            return str(int(f))
+    return str(x)
+
+
+def _whole_numbers(table):
+    """A copy of the table in which whole-valued decimals show as whole numbers (rows_matched 126.0 -> 126)."""
+    out = table.copy()
+    for i in range(out.shape[1]):
+        if str(out.iloc[:, i].dtype).startswith("float"):
+            out.isetitem(i, out.iloc[:, i].map(lambda x: _plain_number(x, blank_nan=True)))
+    return out
+
+
 def format_result(res, max_rows: int = MAX_RESULT_ROWS, max_chars: int = MAX_RESULT_CHARS) -> str:
     """Turns a sandbox RunResult into the small text the model receives. Tables are cut to `max_rows` rows and
     the whole text to `max_chars` characters, so the model can never be sent the dataset by accident."""
@@ -241,12 +262,12 @@ def format_result(res, max_rows: int = MAX_RESULT_ROWS, max_chars: int = MAX_RES
     table = getattr(res, "table", None)
     if table is not None:
         total = getattr(res, "table_total_rows", None) or len(table)
-        parts.append(table.head(max_rows).to_csv(index=False).strip())
+        parts.append(_whole_numbers(table.head(max_rows)).to_csv(index=False).strip())
         if total > max_rows:
             parts.append(f"(only the first {max_rows} of {total} rows are shown)")
     value = getattr(res, "value", None)
     if value is not None:
-        parts.append(value.to_string() if hasattr(value, "to_string") else str(value))
+        parts.append(value.to_string() if hasattr(value, "to_string") else _plain_number(value))
     out = (getattr(res, "stdout", "") or "").strip()
     if out:
         parts.append("printed output:\n" + out[:1000])
@@ -454,7 +475,7 @@ class ChatSession:
         except Exception as e:
             return ChatReply(False, error=describe_model_error(e), calculations=calcs)
         results = "\n".join(c.result_text for c in calcs if c.ok)
-        corrected = False
+        corrected, draft = False, text
         if self.fix_numbers and calcs and no_rows_matched(results) and claims_zero_total(text):
             new = await self._second_try(q, steps, text, ZERO_ASK)     # Day 19: "nothing matched, so the total is 0"
             if new is not None and not claims_zero_total(new):
@@ -465,7 +486,8 @@ class ChatSession:
             if better is not None:
                 text, flagged, corrected = better[0], better[1], True
         self.transcript += [("user", q), ("model", text)]
-        return ChatReply(True, text, flagged, calculations=calcs, corrected=corrected)
+        return ChatReply(True, text, flagged, calculations=calcs, corrected=corrected,
+                         first_draft=draft if corrected else "")
 
     async def _second_try(self, q: str, steps: list, text: str, ask: str):
         """Day 19: asks the model ONE more question about its own answer (one extra request). Returns the new answer,

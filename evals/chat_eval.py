@@ -371,6 +371,7 @@ class Result:
     tries: int = 0                        # how many times the AI's code was run for this question
     healed: bool = False                  # passed after a failed or empty first try
     corrected: bool = False               # Day 18b: the chat rewrote its answer once after a number check
+    first_draft: str = ""                 # Day 20: the answer that was replaced
     ungrounded: list = field(default_factory=list)
     error: str = ""
 
@@ -408,7 +409,8 @@ def run_eval(questions: Sequence[Question], ask: Callable, *, requests_used: Opt
                           and (not calcs[0].ok or getattr(calcs[0], "empty", False) or getattr(calcs[0], "zero", False)))
                 results.append(Result(status=v.status, reasons=v.reasons, answer=reply.text, tries=len(calcs),
                                       healed=healed, ungrounded=list(reply.ungrounded or []),
-                                      corrected=bool(getattr(reply, "corrected", False)), **base))
+                                      corrected=bool(getattr(reply, "corrected", False)),
+                                      first_draft=str(getattr(reply, "first_draft", "") or ""), **base))
         if progress:
             progress(results[-1])
     return results
@@ -476,6 +478,12 @@ def render_markdown(results: Sequence[Result], skipped: Sequence = (), meta: Opt
     minor = [r for r in results if r.status == MINOR]
     if minor:
         lines += ["## Minor slips", ""] + [f"- {r.id}. {r.question} → {r.answer[:200]!r}" for r in minor] + [""]
+    rewritten = [r for r in results if r.corrected and r.first_draft]
+    if rewritten:                                                       # Day 20: what the guards replaced
+        lines += ["## Rewritten answers (first draft, then final)", ""]
+        for r in rewritten:
+            lines += [f"**{r.id}. {r.question}** ({r.status})", f"- first draft: {r.first_draft[:300]!r}",
+                      f"- final: {r.answer[:300]!r}", ""]
     other = [r for r in results if r.status in (NO_ANSWER, NOT_RUN)]
     if other:
         lines += ["## No answer", ""] + [f"- {r.id}. {r.question} → {r.status}: {r.error[:160]}" for r in other] + [""]

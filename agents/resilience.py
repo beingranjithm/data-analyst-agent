@@ -41,6 +41,9 @@ def is_transient_error(exc: BaseException) -> bool:
 
 def describe_model_error(exc: BaseException) -> str:
     """A short message for people: Google's long error dumps are cut down."""
+    if type(exc).__name__ == "CacheMiss":                      # Day 20: plain words for "no saved reply"
+        return ("There is no saved answer for this yet, and 'Replay only' never contacts Google. Choose the "
+                "option that uses the AI (under 'AI replies') to get a fresh answer.")
     text = f"{type(exc).__name__}: {exc}"
     if is_daily_quota_error(text):
         m = _RETRY_IN.search(text)

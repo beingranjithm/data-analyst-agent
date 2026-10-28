@@ -6,7 +6,7 @@
     "chat models": "gemini-3.5-flash-lite, gemini-3.1-flash-lite, gemini-3.6-flash",
     "questions": "30 asked, 0 skipped",
     "real requests": 0,
-    "replayed": 57
+    "replayed": 55
   },
   "summary": {
     "total": 30,
@@ -63,8 +63,8 @@
         "other": 0
       }
     },
-    "corrected": 3,
-    "corrected_ok": 3,
+    "corrected": 1,
+    "corrected_ok": 1,
     "false_alarms": 0,
     "wrong_flagged": 0,
     "calc_runs": 24
@@ -81,6 +81,7 @@
       "tries": 1,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -91,10 +92,11 @@
       "status": "PASS",
       "reasons": [],
       "expected": "6,094",
-      "answer": "A total of 6,094.0 units were sold across the dataset.",
+      "answer": "A total of 6,094 units were sold across all 600 rows in the dataset.",
       "tries": 1,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -109,6 +111,7 @@
       "tries": 0,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -123,6 +126,7 @@
       "tries": 1,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -137,6 +141,7 @@
       "tries": 0,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -151,6 +156,7 @@
       "tries": 1,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -161,10 +167,11 @@
       "status": "PASS",
       "reasons": [],
       "expected": "Europe, 412,650.30",
-      "answer": "The region with the highest total revenue is Europe, with a total revenue of 412,650.30.",
+      "answer": "Europe has the highest total revenue with 412,650.30.",
       "tries": 1,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -179,6 +186,7 @@
       "tries": 1,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -189,10 +197,11 @@
       "status": "PASS",
       "reasons": [],
       "expected": "Stationery",
-      "answer": "The category with the lowest total revenue is Stationery, with a total revenue of 13,244.0.",
+      "answer": "The category with the lowest total revenue is Stationery, with a total revenue of 13,244.",
       "tries": 1,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -203,10 +212,11 @@
       "status": "PASS",
       "reasons": [],
       "expected": "Laptop, Phone, Desk",
-      "answer": "The top 3 products by total revenue, listed from highest to lowest, are:\n\n1. Laptop: 738,135.0\n2. Phone: 508,800.0\n3. Desk: 250,900.0",
+      "answer": "The top 3 products by total revenue, listed from highest to lowest, are:\n\n1. Laptop, with a total revenue of 738,135.00\n2. Phone, with a total revenue of 508,800.00\n3. Desk, with a total revenue of 250,900.00",
       "tries": 1,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -221,6 +231,7 @@
       "tries": 1,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -235,6 +246,7 @@
       "tries": 1,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -245,10 +257,11 @@
       "status": "PASS",
       "reasons": [],
       "expected": "349,969.65",
-      "answer": "The total revenue for the East region is 349,969.65, based on 126.0 rows matched.",
+      "answer": "The total revenue for the East region (calculated across 126 matching rows) is 349,969.65.",
       "tries": 1,
       "healed": false,
-      "corrected": true,
+      "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -263,6 +276,7 @@
       "tries": 1,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -273,10 +287,11 @@
       "status": "PASS",
       "reasons": [],
       "expected": "280,050",
-      "answer": "The total revenue for the Electronics category in the North region, based on 54.0 matched rows, is 280050.0.",
+      "answer": "The total revenue for the Electronics category in the North region is 280,050 across 54 matching rows.",
       "tries": 1,
       "healed": false,
       "corrected": true,
+      "first_draft": "The total revenue for the Electronics category in the North region is 280,550 across 54 matching rows.",
       "ungrounded": [],
       "error": ""
     },
@@ -291,6 +306,7 @@
       "tries": 1,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -305,6 +321,7 @@
       "tries": 1,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -315,10 +332,11 @@
       "status": "PASS",
       "reasons": [],
       "expected": "136,448.70",
-      "answer": "In March 2025, across 53 matched rows, the total revenue was 136,448.70.",
+      "answer": "The total revenue in March 2025 across 53 matching orders was 136,448.70.",
       "tries": 1,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -333,6 +351,7 @@
       "tries": 1,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -347,6 +366,7 @@
       "tries": 1,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -361,6 +381,7 @@
       "tries": 0,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -371,10 +392,11 @@
       "status": "PASS",
       "reasons": [],
       "expected": "412,804.95",
-      "answer": "The total revenue for the first quarter of 2025 (January to March) was 412,804.95 across 149 matching orders.",
+      "answer": "The total revenue in the first quarter of 2025 (January to March) across 149 matched orders was 412,804.95.",
       "tries": 1,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -389,6 +411,7 @@
       "tries": 0,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -403,6 +426,7 @@
       "tries": 1,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -417,6 +441,7 @@
       "tries": 1,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -431,6 +456,7 @@
       "tries": 0,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -445,6 +471,7 @@
       "tries": 0,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -455,10 +482,11 @@
       "status": "PASS",
       "reasons": [],
       "expected": "no such region: say so (quoting a zero total is a minor slip)",
-      "answer": "Nothing matched the Atlantis region, so no total revenue could be calculated.",
+      "answer": "No rows matched the Atlantis region, so the total revenue for that region cannot be calculated.",
       "tries": 1,
       "healed": false,
-      "corrected": true,
+      "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -469,10 +497,11 @@
       "status": "PASS",
       "reasons": [],
       "expected": "a forecast is not in the data: say so, no invented number",
-      "answer": "The dataset only contains orders from the year 2025 (specifically, from 2025-01-01 to 2025-12-31), so there is no data or revenue recorded for next year (2026).",
+      "answer": "There are no records for next year (2026) in the dataset, as the data only covers the period from 2025-01-01 to 2025-12-31. The total revenue for 2026 is 0 across 0 matched rows.",
       "tries": 1,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     },
@@ -483,10 +512,11 @@
       "status": "PASS",
       "reasons": [],
       "expected": "no data for 2030: say so (quoting a zero total is a minor slip)",
-      "answer": "There was no revenue in 2030, as 0 rows matched that year (the dataset's dates only range from 2025-01-01 to 2025-12-31).",
+      "answer": "There were no orders in 2030 (0 rows matched), so the total revenue for that year is 0. The dataset's dates only range from 2025-01-01 to 2025-12-31.",
       "tries": 1,
       "healed": false,
       "corrected": false,
+      "first_draft": "",
       "ungrounded": [],
       "error": ""
     }

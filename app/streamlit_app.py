@@ -17,6 +17,7 @@ from tools.sandbox import run_code  # noqa: E402
 from ui.chat_tab import render_chat  # noqa: E402
 from ui.dashboard_tab import render_ai_dashboard  # noqa: E402
 from ui.filter_panel import render_filter_panel  # noqa: E402
+from ui.kpi_card import show_kpi  # noqa: E402  (Day 20)
 
 st.set_page_config(page_title="Agentic Data Analyst", page_icon="📊", layout="wide")
 
@@ -61,7 +62,9 @@ def show_chart(df, spec, key):
 
 
 st.title("📊 Agentic Data Analyst")
-st.caption("Upload a CSV and get an instant overview. The '✨ AI dashboard' tab plans and builds a dashboard with AI after you approve the plan. Chat comes next.")
+st.caption("Upload a CSV, or pick a built-in file. The '✨ AI dashboard' tab plans a dashboard with AI and builds it after "
+           "you approve the plan. The '💬 Chat' tab answers questions about your data and shows the calculation behind "
+           "every number. Filters are in the sidebar.")  # Day 20
 
 # ---- choose the data source ----
 source = st.sidebar.radio("Data source", ["Upload my own CSV", "Built-in sample sales data", "Messy test file"])
@@ -172,11 +175,11 @@ df, profile = fdf, fprofile
 
 # ============ TAB 2: CHART GALLERY (rule-based) ============
 with tab_gallery:
-    st.caption("A dashboard made by simple fixed rules. On Day 8 an AI planner will do this job instead, "
-               "and we can compare the two.")
+    st.caption("A dashboard made by simple fixed rules, with no AI. Compare it with the '✨ AI dashboard' tab. "
+               "It uses the rows chosen in the sidebar filters.")
     kpis = compute_kpis(df, profile)
     for col, k in zip(st.columns(len(kpis)), kpis):
-        col.metric(k["label"], k["value"])
+        show_kpi(col, k)
 
     specs = suggest_charts(profile)
     if not specs:
@@ -193,7 +196,7 @@ with tab_gallery:
 # ============ TAB 3: BUILD A CHART BY HAND ============
 with tab_builder:
     st.caption("Pick a chart type and columns yourself. The 'spec' shown below is the same format "
-               "the AI agents will produce later.")
+               "the AI planner produces.")
     by_role = lambda *roles: [c["name"] for c in profile["columns"] if c["role"] in roles]  # noqa: E731
     time_cols = by_role("datetime")
     measure_cols = profile["measures"]
@@ -264,7 +267,8 @@ SANDBOX_EXAMPLES = {
 }
 
 with tab_sandbox:
-    st.caption("This is where AI-written code will run. Try the examples, especially the red ones, "
+    st.caption("This is where AI-written code runs (the chat's calculations and the AI dashboard's charts). "
+               "Try the examples, especially the red ones, "
                "and watch which safety layer stops each attack.")
     example = st.selectbox("Example code", list(SANDBOX_EXAMPLES))
     code = st.text_area("Python code (use df, pd, np, px, go; put the answer in `result` or a Plotly figure in `fig`)",
