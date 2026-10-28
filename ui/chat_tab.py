@@ -25,7 +25,8 @@ def default_session_factory(profile, settings):
     from agents.chat_agent import MAX_CODE_RUNS, ChatSession
     from agents.llm_factory import make_llm
     model = make_llm("chat", mode=settings["cache_mode"])
-    return ChatSession(profile, model, tables=settings.get("df"), max_code_runs=MAX_CODE_RUNS)
+    return ChatSession(profile, model, tables=settings.get("df"), max_code_runs=MAX_CODE_RUNS,
+                       scope=settings.get("scope", ""))
 
 
 def _clear_chat():
@@ -67,7 +68,7 @@ def _starters(profile, can_calculate):
     return qs
 
 
-def render_chat(profile, data_key: str, *, df=None, session_factory: Optional[Callable] = None):
+def render_chat(profile, data_key: str, *, df=None, session_factory: Optional[Callable] = None, scope: str = ""):
     """Draws the tab. `data_key` identifies the dataset: a new key starts a new conversation.
     `df` is the data the AI may calculate on (None = answer from the summary only).
     `session_factory(profile, settings)` can replace the real models (tests do); settings holds the data as "df"."""
@@ -89,6 +90,8 @@ def render_chat(profile, data_key: str, *, df=None, session_factory: Optional[Ca
         st.error("No Gemini API key found. Put GOOGLE_API_KEY=... in hello_agent/.env, or choose 'Replay only'.")
         blocked = True
     st.caption(CALC_NOTE if df is not None else LIMIT_NOTE)
+    if scope:
+        st.info(f"🔎 Answering only for the filtered rows: {scope}. Changing the filter starts a new conversation.")
 
     if ss.get("chat_mode") != mode:                 # a different reply setting means a different model object
         ss.pop("chat_session", None)
@@ -100,7 +103,7 @@ def render_chat(profile, data_key: str, *, df=None, session_factory: Optional[Ca
 
     if session is None and not blocked:
         try:
-            session = (session_factory or default_session_factory)(profile, {"cache_mode": mode, "df": df})
+            session = (session_factory or default_session_factory)(profile, {"cache_mode": mode, "df": df, "scope": scope})
         except Exception as e:
             st.error(f"Could not start the chat: {type(e).__name__}: {e}")
             return

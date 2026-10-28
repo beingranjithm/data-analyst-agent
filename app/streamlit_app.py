@@ -16,6 +16,7 @@ from tools.profiler import describe_column, profile_dataframe, profile_to_text  
 from tools.sandbox import run_code  # noqa: E402
 from ui.chat_tab import render_chat  # noqa: E402
 from ui.dashboard_tab import render_ai_dashboard  # noqa: E402
+from ui.filter_panel import render_filter_panel  # noqa: E402
 
 st.set_page_config(page_title="Agentic Data Analyst", page_icon="📊", layout="wide")
 
@@ -104,6 +105,15 @@ df, profile = table["df"], table["profile"]
 d = profile["dataset"]
 st.subheader(f"Table: {table['name']}")
 
+# Day 17: sidebar filters. The Overview and the Code sandbox always use all rows; the other tabs use the slice.
+base_key = f"{table['name']}:{hashlib.sha1(data).hexdigest()[:12]}"
+fdf, filter_label, filter_sig = render_filter_panel(df, profile, base_key)
+if len(fdf) == 0:
+    st.warning("No rows match the current filters. Widen them (or press 'Clear filters') in the sidebar.")
+    st.stop()
+fprofile = profile_dataframe(fdf) if filter_label else profile
+full_profile = profile
+
 tab_overview, tab_ai, tab_chat, tab_gallery, tab_builder, tab_sandbox = st.tabs(
     ["Overview", "✨ AI dashboard", "💬 Chat", "Chart gallery", "Build a chart", "Code sandbox"])
 
@@ -156,6 +166,9 @@ with tab_overview:
 
     st.download_button("Download full profile (JSON)", json.dumps(profile, indent=2),
                        file_name="profile.json", mime="application/json")
+
+# From here on, df and profile mean the FILTERED rows (the Overview above used all rows).
+df, profile = fdf, fprofile
 
 # ============ TAB 2: CHART GALLERY (rule-based) ============
 with tab_gallery:
@@ -292,8 +305,8 @@ with tab_sandbox:
 
 # ============ TAB 5: AI DASHBOARD (plan -> you approve -> build) ============
 with tab_ai:
-    render_ai_dashboard(df, profile, data_key=f"{table['name']}:{hashlib.sha1(data).hexdigest()[:12]}")
+    render_ai_dashboard(df, full_profile, data_key=base_key, scope=filter_label)
 
 # ============ TAB: CHAT (questions about the data summary) ============
 with tab_chat:
-    render_chat(profile, data_key=f"{table['name']}:{hashlib.sha1(data).hexdigest()[:12]}", df=df)
+    render_chat(profile, data_key=base_key + ("|" + filter_sig if filter_sig else ""), df=df, scope=filter_label)

@@ -161,6 +161,14 @@ def ungrounded_numbers(answer: str, profile_text: str, question: str = "", resul
 
 
 # ---------------------------------------------------------------- what the chat is shown
+def scope_note(scope: str) -> str:
+    """Day 17: tells the model that the person filtered the data (empty text when nothing is filtered)."""
+    if not scope:
+        return ""
+    return ("FILTER ACTIVE: the person filtered the data. Everything below, and every calculation, covers ONLY "
+            f"these rows: {scope}. Say so when it matters. You know nothing about the other rows.\n\n")
+
+
 def profile_text_for_chat(profile: dict) -> str:
     """The normal data summary plus exact missing-value COUNTS (the summary only has percentages).
     Still only summary numbers from the profile, never rows."""
@@ -283,11 +291,12 @@ class ChatSession:
     """One conversation about one dataset. `model` is required on purpose (use make_llm("chat"))."""
 
     def __init__(self, profile: dict, model, *, tables=None, runner=None, max_code_runs: int = 1,
-                 max_turns: int = 8, delays=DEFAULT_DELAYS, sleep=asyncio.sleep, on_wait=None):
+                 max_turns: int = 8, delays=DEFAULT_DELAYS, sleep=asyncio.sleep, on_wait=None, scope: str = ""):
         """`tables`: the data to calculate on (a DataFrame or a dict of them). Without it the chat answers from
         the profile only (Day 14). `runner(code, tables)` runs model-written code (default: the sandbox)."""
         self.profile = profile
-        self.profile_text = profile_text_for_chat(profile)
+        self.scope = scope
+        self.profile_text = scope_note(scope) + profile_text_for_chat(profile)
         self.model = model
         self.tables = tables
         self.instruction = CALC_INSTRUCTION if tables is not None else INSTRUCTION

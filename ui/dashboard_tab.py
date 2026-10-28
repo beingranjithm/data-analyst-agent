@@ -252,7 +252,8 @@ def _simple(message, kind, button_label, button_key):
 
 
 # ---------------------------------------------------------------- entry point
-def render_ai_dashboard(df, profile, data_key: str, *, session_factory: Optional[Callable] = None):
+def render_ai_dashboard(df, profile, data_key: str, *, session_factory: Optional[Callable] = None,
+                        scope: str = ""):
     """Draws the tab. `data_key` identifies the dataset: a new key starts over (settings are kept).
     `session_factory(df, profile, settings, progress)` can replace the real models (tests do)."""
     ss = st.session_state
@@ -261,6 +262,18 @@ def render_ai_dashboard(df, profile, data_key: str, *, session_factory: Optional
             del ss[key]
         ss["ai_data_key"] = data_key
     stage = ss.setdefault("ai_stage", "idle")
+    if stage == "idle":                        # Day 17: remember which rows the dashboard is built for
+        ss["ai_scope"] = scope
+        if scope:
+            st.info(f"🔎 The dashboard will be built only for the filtered rows: {scope}")
+    else:
+        built = ss.get("ai_scope", "")
+        if built != scope:
+            st.warning(f"The filter changed after this dashboard was started. It covers "
+                       f"{built or 'all rows'}, but the filter is now {scope or 'all rows'}. "
+                       "Start over (or cancel) to build it for the current rows.")
+        elif built and stage == "done":
+            st.caption(f"🔎 Built only for the filtered rows: {built}")
     if stage == "review":
         _review()
     elif stage == "done":
