@@ -116,6 +116,7 @@ class ChatReply:
     ungrounded: list = field(default_factory=list)    # numbers in the answer that are in neither the summary nor a result
     error: Optional[str] = None
     calculations: list = field(default_factory=list)  # list of Calculation (empty when none was needed)
+    corrected: bool = False                           # Day 18b: a wrong number was found and the answer rewritten once
 
 
 # ---------------------------------------------------------------- honesty check
@@ -291,11 +292,13 @@ class ChatSession:
     """One conversation about one dataset. `model` is required on purpose (use make_llm("chat"))."""
 
     def __init__(self, profile: dict, model, *, tables=None, runner=None, max_code_runs: int = 1,
-                 max_turns: int = 8, delays=DEFAULT_DELAYS, sleep=asyncio.sleep, on_wait=None, scope: str = ""):
+                 max_turns: int = 8, delays=DEFAULT_DELAYS, sleep=asyncio.sleep, on_wait=None, scope: str = "",
+                 fix_numbers: bool = True):
         """`tables`: the data to calculate on (a DataFrame or a dict of them). Without it the chat answers from
         the profile only (Day 14). `runner(code, tables)` runs model-written code (default: the sandbox)."""
         self.profile = profile
         self.scope = scope
+        self.fix_numbers = fix_numbers
         self.profile_text = scope_note(scope) + profile_text_for_chat(profile)
         self.model = model
         self.tables = tables
@@ -421,8 +424,33 @@ class ChatSession:
         except Exception as e:
             return ChatReply(False, error=describe_model_error(e), calculations=calcs)
         results = "\n".join(c.result_text for c in calcs if c.ok)
+        flagged = ungrounded_numbers(text, self.profile_text, q, results)
+        corrected = False
+        if flagged and results and self.fix_numbers:          # Day 18b: one chance to fix a wrongly copied number
+            better = await self._fix_numbers(q, steps, text, flagged, results)
+            if better is not None:
+                text, flagged, corrected = better[0], better[1], True
         self.transcript += [("user", q), ("model", text)]
-        return ChatReply(True, text, ungrounded_numbers(text, self.profile_text, q, results), calculations=calcs)
+        return ChatReply(True, text, flagged, calculations=calcs, corrected=corrected)
+
+    async def _fix_numbers(self, q: str, steps: list, text: str, flagged: list, results: str):
+        """Day 18b: the answer has a number that is in neither the RESULT nor the profile (often a digit copied
+        wrongly). Ask the model ONCE to check its numbers against the RESULT and rewrite the answer.
+        Returns (new text, its remaining flagged numbers) only when the rewrite is clearly better, else None.
+        A problem here (quota, network) never costs the person the answer they already have."""
+        ask = ("Your answer contains numbers that are in neither the RESULT nor the profile: " + ", ".join(flagged)
+               + ". A number may have been copied wrongly. Check every number against the RESULT and rewrite your whole "
+               "answer in plain language, copying numbers digit for digit from the RESULT or the profile. "
+               "Reply with prose only, no code.")
+        try:
+            new = await self._model_text(ask, self._history() + [_msg("user", q)] + steps
+                                         + [_msg("model", text), _msg("user", ask)])
+        except Exception:
+            return None
+        if not new or extract_code(new) is not None:
+            return None
+        again = ungrounded_numbers(new, self.profile_text, q, results)
+        return (new, again) if len(again) < len(flagged) else None
 
     def ask(self, question: str) -> ChatReply:
         return _run_on_shared_loop(self.ask_async(question))

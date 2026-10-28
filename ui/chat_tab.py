@@ -46,12 +46,15 @@ def _show_calculations(calcs):
             st.text(("Result shown to the AI:\n" if c.ok else "Error:\n") + c.result_text)
 
 
-def _show_history(session, notes, calcs):
+def _show_history(session, notes, calcs, fixed=None):
     for i, (role, text) in enumerate(session.transcript):
         with st.chat_message("user" if role == "user" else "assistant"):
             st.markdown(text)
             if calcs.get(i):
                 _show_calculations(calcs[i])
+            if (fixed or {}).get(i):                       # Day 18b
+                st.caption("✓ The first draft of this answer had a number that did not match the calculation, so it "
+                           "was rewritten once. Open \"Show the calculation\" to check it.")
             numbers = notes.get(i)
             if numbers:
                 st.warning("These numbers are not in the data summary, so please double-check them: "
@@ -100,6 +103,7 @@ def render_chat(profile, data_key: str, *, df=None, session_factory: Optional[Ca
     transcript_kept = session.transcript if session is not None else ss.get("chat_kept", [])
     notes = ss.setdefault("chat_notes", {})
     calcs = ss.setdefault("chat_calcs", {})
+    fixed = ss.setdefault("chat_fixed", {})
 
     if session is None and not blocked:
         try:
@@ -112,7 +116,7 @@ def render_chat(profile, data_key: str, *, df=None, session_factory: Optional[Ca
     if session is None:
         return
 
-    _show_history(session, notes, calcs)
+    _show_history(session, notes, calcs, fixed)
 
     question = None
     if not session.transcript:
@@ -138,6 +142,8 @@ def render_chat(profile, data_key: str, *, df=None, session_factory: Optional[Ca
                 notes[len(session.transcript) - 1] = reply.ungrounded
             if reply.calculations:
                 calcs[len(session.transcript) - 1] = reply.calculations
+            if getattr(reply, "corrected", False):
+                fixed[len(session.transcript) - 1] = True
         else:
             ss["chat_error"] = reply.error
         ss["chat_kept"] = list(session.transcript)
@@ -147,7 +153,7 @@ def render_chat(profile, data_key: str, *, df=None, session_factory: Optional[Ca
         a, b = st.columns([1, 3])
         if a.button("Start a new conversation", key="chat_reset"):
             session.reset()
-            ss["chat_notes"], ss["chat_calcs"], ss["chat_kept"] = {}, {}, []
+            ss["chat_notes"], ss["chat_calcs"], ss["chat_kept"], ss["chat_fixed"] = {}, {}, [], {}
             st.rerun()
         real, replayed = usage_of(getattr(session, "model", None))
         b.caption(f"AI requests in this chat: {real} real, {replayed} replayed from saved replies.")
