@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agentic Data Analyst</title>
+<meta name="description" content="Upload CSV files, approve an AI-planned dashboard chart by chart, and ask questions about the data — every answer comes with the code and the result behind it.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #fafbf8;
+    --paper-raised: #f3f5f0;
+    --card: #ffffff;
+    --ink: #14181f;
+    --ink-muted: #5c6570;
+    --line: #dce1db;
+    --line-soft: #e8ebe4;
+    --accent: #c23b2a;
+    --accent-deep: #96291c;
+    --accent-soft: #fbeae6;
+    --panel: #12161c;
+    --panel-fg: #dce5de;
+    --panel-fg-dim: #8b958d;
+    --panel-line: #262c34;
+    --ok: #3f8f5d;
+    --radius: 8px;
+    --radius-sm: 5px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #101318; --paper-raised: #161a21; --card: #1a1e25;
+      --ink: #e8eae3; --ink-muted: #99a2a7; --line: #262c33; --line-soft: #1d232a;
+      --accent: #e2593c; --accent-deep: #f3875f; --accent-soft: #241712;
+      --panel: #0a0d11; --panel-fg: #d7e0db; --panel-fg-dim: #76807c; --panel-line: #212730;
+      --ok: #5fbe84;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #101318; --paper-raised: #161a21; --card: #1a1e25;
+    --ink: #e8eae3; --ink-muted: #99a2a7; --line: #262c33; --line-soft: #1d232a;
+    --accent: #e2593c; --accent-deep: #f3875f; --accent-soft: #241712;
+    --panel: #0a0d11; --panel-fg: #d7e0db; --panel-fg-dim: #76807c; --panel-line: #212730;
+    --ok: #5fbe84;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px; line-height: 1.55; -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  a { color: var(--accent-deep); text-decoration-color: color-mix(in srgb, var(--accent-deep) 40%, transparent); text-underline-offset: 3px; }
+  a:hover { text-decoration-color: var(--accent-deep); }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  @media (max-width: 600px) { .wrap { padding: 0 18px; } }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- logo ---------- */
+  .logo { display: inline-flex; align-items: center; gap: 9px; text-decoration: none; color: var(--ink); }
+  .logo svg { flex: none; display: block; }
+  .logo-word { font-weight: 600; font-size: 16px; letter-spacing: -0.01em; }
+
+  /* ---------- header / nav ---------- */
+  header.top {
+    position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--paper) 88%, transparent);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid var(--line);
+  }
+  header.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 64px; padding-top: 10px; padding-bottom: 10px; }
+  nav.primary { display: flex; align-items: center; gap: 26px; }
+  nav.primary a.navlink { font-size: 14px; color: var(--ink-muted); text-decoration: none; }
+  nav.primary a.navlink:hover { color: var(--ink); }
+  .nav-cta { display: flex; align-items: center; gap: 14px; }
+  .nav-cta .top-link { font-size: 14px; color: var(--ink-muted); text-decoration: none; }
+  .nav-cta .top-link:hover { color: var(--accent-deep); }
+  @media (max-width: 760px) { nav.primary { display: none; } }
+  @media (max-width: 560px) { .nav-cta .top-link { display: none; } }
+  @media (max-width: 420px) { .logo-word { font-size: 14px; } .nav-cta .btn { height: 34px; padding: 0 12px; font-size: 13px; } header.top .wrap { gap: 8px; } }
+  .nav-cta .btn .short { display: none; }
+  @media (max-width: 400px) { .nav-cta .btn .full { display: none; } .nav-cta .btn .short { display: inline; } }
+
+  /* ---------- buttons ---------- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; height: 44px; padding: 0 20px;
+    border-radius: var(--radius-sm); font-size: 15px; font-weight: 500; text-decoration: none;
+    border: 1px solid var(--line); transition: background .15s ease, border-color .15s ease, transform .1s ease;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn-sm { height: 36px; padding: 0 15px; font-size: 13.5px; }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff6f3; box-shadow: 0 1px 0 rgba(0,0,0,.08), 0 6px 16px -8px color-mix(in srgb, var(--accent) 70%, transparent); }
+  .btn-primary:hover { background: var(--accent-deep); border-color: var(--accent-deep); }
+  .btn-secondary { color: var(--ink); background: var(--card); }
+  .btn-secondary:hover { border-color: var(--ink-muted); }
+  .btn-ghost { color: var(--ink); background: transparent; border-color: transparent; }
+  .btn-ghost:hover { border-color: var(--line); }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 64px 0 0; position: relative; overflow: hidden; }
+  .hero::before {
+    content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(var(--line-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+    background-size: 28px 28px; background-position: center -1px;
+    mask-image: linear-gradient(to bottom, black 0%, black 55%, transparent 92%);
+    -webkit-mask-image: linear-gradient(to bottom, black 0%, black 55%, transparent 92%);
+  }
+  .hero > .wrap { position: relative; z-index: 1; }
+  .hero-inner { padding-bottom: 56px; }
+  .hero-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 52px; align-items: start; }
+  @media (max-width: 880px) { .hero-grid { grid-template-columns: 1fr; gap: 36px; } }
+  .eyebrow-plain { font-size: 14px; color: var(--accent-deep); font-weight: 500; margin: 0 0 14px; }
+  h1 {
+    font-size: clamp(34px, 4.6vw, 50px); line-height: 1.1; letter-spacing: -0.02em;
+    margin: 0 0 18px; font-weight: 600; max-width: 14ch;
+  }
+  .lead { font-size: 18px; color: var(--ink-muted); max-width: 46ch; margin: 0 0 28px; }
+  .cta-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 36px; }
+
+  /* ---------- stat band ---------- */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border-top: 1px solid var(--line); }
+  .stats .stat { padding: 18px 20px 0 0; border-right: 1px solid var(--line); }
+  .stats .stat:last-child { border-right: none; padding-right: 0; }
+  .stats .stat .n { font-family: "IBM Plex Mono", monospace; font-size: clamp(19px, 2.4vw, 26px); font-weight: 500; color: var(--ink); }
+  .stats .stat .l { font-size: 12.5px; color: var(--ink-muted); margin-top: 4px; line-height: 1.4; }
+  @media (max-width: 760px) { .stats { grid-template-columns: repeat(2, 1fr); row-gap: 18px; } .stats .stat:nth-child(2) { border-right: none; } }
+
+  /* ---------- evidence frame (real screenshot) ---------- */
+  .evidence { border: 1px solid var(--panel-line); border-radius: var(--radius); overflow: hidden; background: var(--panel); box-shadow: 0 20px 44px -24px rgba(10,13,16,.45); }
+  .evidence-bar { display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: var(--panel); border-bottom: 1px solid var(--panel-line); color: var(--panel-fg-dim); font-size: 12.5px; }
+  .evidence-bar .live { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent); }
+  .evidence-bar .url { color: var(--panel-fg); }
+  .evidence img { display: block; width: 100%; height: auto; }
+  .evidence-caption { font-size: 12.5px; color: var(--ink-muted); margin-top: 10px; max-width: 42ch; }
+
+  /* ---------- sections ---------- */
+  section { padding: 64px 0; }
+  section.tint { background: var(--paper-raised); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 28px; flex-wrap: wrap; }
+  h2 { font-size: 23px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 8px; }
+  .section-intro { color: var(--ink-muted); max-width: 60ch; margin: 0; font-size: 15px; }
+
+  /* ---------- ledger rows (sequence: how it works) ---------- */
+  .steps { border-top: 1px solid var(--line); }
+  .step-row { display: grid; grid-template-columns: 40px 1fr; gap: 18px; padding: 22px 0; border-bottom: 1px solid var(--line); }
+  .step-row .num { font-size: 13px; color: var(--accent-deep); padding-top: 2px; }
+  .step-row h3 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
+  .step-row p { margin: 0; color: var(--ink-muted); font-size: 15px; max-width: 60ch; }
+
+  /* ---------- feature rows with icons ---------- */
+  .rows { border-top: 1px solid var(--line); }
+  .row { display: grid; grid-template-columns: 34px 180px 1fr; gap: 18px; padding: 20px 0; border-bottom: 1px solid var(--line); align-items: start; }
+  .row .icon { width: 34px; height: 34px; border-radius: 7px; background: var(--card); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; color: var(--accent-deep); flex: none; }
+  .row .icon svg { width: 17px; height: 17px; }
+  .row .label { font-weight: 600; font-size: 15px; padding-top: 6px; }
+  .row .desc { color: var(--ink-muted); font-size: 15px; max-width: 58ch; padding-top: 6px; }
+  @media (max-width: 680px) { .row { grid-template-columns: 34px 1fr; } .row .label { grid-column: 2; padding-top: 0; } .row .desc { grid-column: 1 / -1; padding-top: 2px; margin-left: 0; } }
+
+  /* ---------- evaluation table ---------- */
+  .eval-table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  .eval-table th { text-align: left; font-weight: 500; color: var(--ink-muted); font-size: 13px; padding: 0 0 10px; border-bottom: 1px solid var(--line); }
+  .eval-table td { padding: 16px 14px 16px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .eval-table td.num { font-family: "IBM Plex Mono", monospace; white-space: nowrap; }
+  .eval-table td.result { font-family: "IBM Plex Mono", monospace; }
+  .pass { color: var(--ok); }
+  .table-scroll { overflow-x: auto; }
+
+  .honest { margin-top: 24px; padding: 2px 0 2px 18px; border-left: 2px solid var(--accent); }
+  .honest p { margin: 10px 0; font-size: 14.5px; color: var(--ink-muted); max-width: 62ch; }
+  .honest strong { color: var(--ink); font-weight: 600; }
+
+  /* ---------- code panel ---------- */
+  .code-panel { background: var(--panel); border: 1px solid var(--panel-line); border-radius: var(--radius); padding: 18px 20px; overflow-x: auto; font-size: 13.5px; line-height: 1.75; color: var(--panel-fg); }
+  .code-panel .muted { color: var(--panel-fg-dim); }
+
+  /* ---------- closing CTA band ---------- */
+  .cta-band { background: var(--panel); color: var(--panel-fg); padding: 56px 0; }
+  .cta-band .wrap { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+  .cta-band h2 { color: #fff; margin: 0 0 6px; }
+  .cta-band p { color: var(--panel-fg-dim); margin: 0; font-size: 15px; max-width: 46ch; }
+  .cta-band .cta-row { margin: 0; }
+  .cta-band .btn-secondary { background: transparent; border-color: var(--panel-line); color: var(--panel-fg); }
+  .cta-band .btn-secondary:hover { border-color: var(--panel-fg-dim); }
+
+  footer { padding: 36px 0 60px; }
+  footer .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  footer p { color: var(--ink-muted); font-size: 13.5px; margin: 0; }
+  footer .foot-links { font-size: 13.5px; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="#top">
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="24" height="24" rx="5" stroke="currentColor" stroke-width="1.3" opacity="0.35"/>
+        <rect x="6" y="6" width="5.5" height="5.5" rx="1" fill="currentColor" opacity="0.18"/>
+        <rect x="14.5" y="6" width="5.5" height="5.5" rx="1" fill="currentColor" opacity="0.18"/>
+        <rect x="6" y="14.5" width="5.5" height="5.5" rx="1" fill="currentColor" opacity="0.18"/>
+        <rect x="14.5" y="14.5" width="5.5" height="5.5" rx="1" fill="#c23b2a"/>
+      </svg>
+      <span class="logo-word">Agentic Data Analyst</span>
+    </a>
+    <nav class="primary">
+      <a class="navlink" href="#how">How it works</a>
+      <a class="navlink" href="#features">What it does</a>
+      <a class="navlink" href="#evaluation">Evaluation</a>
+      <a class="navlink" href="#run">Run it yourself</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="top-link" href="https://github.com/beingranjithm/data-analyst-agent">GitHub</a>
+      <a class="btn btn-primary btn-sm" href="https://analystiq-agent.streamlit.app"><span class="full">Open the live demo</span><span class="short">Live demo</span></a>
+    </div>
+  </div>
+</header>
+
+<a id="top"></a>
+<section class="hero">
+  <div class="wrap hero-inner">
+    <div class="hero-grid">
+      <div>
+        <p class="eyebrow-plain">Built with Google ADK and Gemini</p>
+        <h1>Ask your data a question. See exactly how it answered.</h1>
+        <p class="lead">Upload one or more CSV files. An AI plans a dashboard you approve chart by chart, and a
+          chat answers questions about the data — every number comes with the pandas code and the result that
+          produced it, not just a claim.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="https://analystiq-agent.streamlit.app">Open the live demo</a>
+          <a class="btn btn-secondary" href="https://github.com/beingranjithm/data-analyst-agent">View the code</a>
+        </div>
+      </div>
+      <div>
+        <div class="evidence">
+          <div class="evidence-bar">
+            <span class="live"></span>
+            <span class="url mono">analystiq-agent.streamlit.app</span>
+          </div>
+          <img src="assets/dashboard.png" alt="The live app after loading the Formula 1 demo set: it found 14 tables and 22 links, joined them into one 880-row, 52-column table, and opened the AI dashboard tab." loading="eager">
+        </div>
+        <p class="evidence-caption">An unedited screenshot of the live app, seconds after opening the Formula 1 demo set.</p>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="n">18/18</div><div class="l">eval questions answered correctly, after fixes</div></div>
+      <div class="stat"><div class="n">14</div><div class="l">CSV tables joined with no AI, by comparing values</div></div>
+      <div class="stat"><div class="n">3</div><div class="l">Gemini models chained so a quota limit never stops it</div></div>
+      <div class="stat"><div class="n">$0</div><div class="l">to try the demo — bring your own free Gemini key</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="section-head"><h2>How it works</h2></div>
+    <p class="section-intro" style="margin-bottom:0;">Four steps, in order. Nothing is built until you say so.</p>
+    <div class="steps">
+      <div class="step-row">
+        <div class="num mono">01</div>
+        <div><h3>Upload</h3><p>Add one or more CSV files, or open the Formula 1 demo. The relationships between
+          files — which column points to which row of another — are found without AI, by comparing values.</p></div>
+      </div>
+      <div class="step-row">
+        <div class="num mono">02</div>
+        <div><h3>Plan and approve</h3><p>A planner agent reads a text summary of the data (never the raw rows)
+          and proposes a dashboard. You drop what you don't want, then approve it.</p></div>
+      </div>
+      <div class="step-row">
+        <div class="num mono">03</div>
+        <div><h3>Build</h3><p>A chart agent writes the code for each chart and a sandbox runs it. A failed
+          chart gets a cleaned-up error and one more try; a rule-based builder fills in anything that still
+          fails, so a dashboard always comes out.</p></div>
+      </div>
+      <div class="step-row">
+        <div class="num mono">04</div>
+        <div><h3>Ask</h3><p>The chat writes pandas code for questions that need real numbers. Every answer has
+          a "Show the calculation" panel with the exact code and result, and an unsupported number gets a
+          visible warning instead of being stated as fact.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="features" class="tint">
+  <div class="wrap">
+    <div class="section-head"><h2>What it does</h2></div>
+    <div class="rows">
+      <div class="row">
+        <div class="icon"><svg viewBox="0 0 20 20" fill="none"><path d="M4 10.5l3.5 3.5L16 5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="label">Human in the loop</div>
+        <div class="desc">The AI proposes a dashboard; you approve or drop each chart before anything is built.</div>
+      </div>
+      <div class="row">
+        <div class="icon"><svg viewBox="0 0 20 20" fill="none"><circle cx="8.5" cy="8.5" r="5" stroke="currentColor" stroke-width="1.6"/><path d="M12.3 12.3L16 16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+        <div class="label">Answers you can check</div>
+        <div class="desc">Numbers come from code run on your data, shown in the open — not generated prose.</div>
+      </div>
+      <div class="row">
+        <div class="icon"><svg viewBox="0 0 20 20" fill="none"><circle cx="5" cy="5" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="15" cy="5" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="15" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M6.6 6.2L8.7 13.2M13.4 6.2L11.3 13.2M7 5H13" stroke="currentColor" stroke-width="1.4"/></svg></div>
+        <div class="label">Several tables at once</div>
+        <div class="desc">Linked files are joined with left joins, so row counts never change, and a guard blocks the classic mistake of merging two event tables and summing.</div>
+      </div>
+      <div class="row">
+        <div class="icon"><svg viewBox="0 0 20 20" fill="none"><path d="M10 2a8 8 0 100 16 8 8 0 000-16z" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+        <div class="label">Built for free-tier limits</div>
+        <div class="desc">Requests are paced and cached, and a chain of three Gemini models takes over when one's daily quota runs out.</div>
+      </div>
+      <div class="row">
+        <div class="icon"><svg viewBox="0 0 20 20" fill="none"><circle cx="6.5" cy="13.5" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M8.7 11.3L16 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M12 8l2 2M14.5 5.5l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+        <div class="label">Bring your own key</div>
+        <div class="desc">A visitor's Gemini key lives only in their browser session — never saved, logged, or shared — and "Forget my key" erases it.</div>
+      </div>
+      <div class="row">
+        <div class="icon"><svg viewBox="0 0 20 20" fill="none"><path d="M10 2.5l6 2.3v4.4c0 4-2.6 6.9-6 8.3-3.4-1.4-6-4.3-6-8.3V4.8l6-2.3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+        <div class="label">Sandboxed code</div>
+        <div class="desc">AI-written code runs in a separate, locked-down process: no network, no stored keys, and a static check before anything executes.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="evaluation">
+  <div class="wrap">
+    <div class="section-head"><h2>Evaluation</h2></div>
+    <p class="section-intro">Accuracy measured against answers computed independently with plain pandas on the same data.</p>
+    <div class="table-scroll" style="margin-top:24px;">
+      <table class="eval-table">
+        <thead><tr><th>Test</th><th>Questions</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Formula 1, all 14 tables, several tables per question</td>
+            <td class="num">18</td>
+            <td class="result">16/18 → 17/18 → <span class="pass">18/18</span></td>
+          </tr>
+          <tr>
+            <td>Formula 1 demo subset (2021–2022), answered from saved replies</td>
+            <td class="num">11</td>
+            <td class="result"><span class="pass">11/11</span>, 0 requests to Google</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="honest">
+      <p><strong>This is not a blind test.</strong> The two first-run misses — one counted result rows instead
+        of distinct races, one compared a number column with quoted text — were fixed after I looked at them,
+        then the same 18 questions were run again.</p>
+      <p>The checker is automatic: it compares numbers and names against expected values, so it can mark a
+        correct but unusually phrased answer wrong, and it can't judge an explanation.</p>
+      <p>The demo score shows the saved answers are right and replay works — not that the AI is right every time.</p>
+    </div>
+  </div>
+</section>
+
+<section id="limits" class="tint">
+  <div class="wrap">
+    <div class="section-head"><h2>Limits on the free host</h2></div>
+    <div class="rows">
+      <div class="row" style="grid-template-columns: 180px 1fr;">
+        <div class="label" style="padding-top:0;">No live AI code here</div>
+        <div class="desc" style="padding-top:0;">The free host doesn't provide the sandbox's file-system lock, so the app refuses to run any AI-written code there. Only the saved, pre-checked demo code runs.</div>
+      </div>
+      <div class="row" style="grid-template-columns: 180px 1fr;">
+        <div class="label" style="padding-top:0;">Your own key goes partway</div>
+        <div class="desc" style="padding-top:0;">On the hosted demo, a visitor's key gets summary-only chat answers and a fixed-rule dashboard — not live calculations.</div>
+      </div>
+      <div class="row" style="grid-template-columns: 180px 1fr;">
+        <div class="label" style="padding-top:0;">Process isolation, not a container</div>
+        <div class="desc" style="padding-top:0;">Strong enough for a demo with fail-closed checks, but please don't upload confidential data.</div>
+      </div>
+      <div class="row" style="grid-template-columns: 180px 1fr;">
+        <div class="label" style="padding-top:0;">CSV only, for now</div>
+        <div class="desc" style="padding-top:0;">Up to 15 MB per file and 30 MB in total on the hosted demo.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="run">
+  <div class="wrap">
+    <div class="section-head"><h2>Run it yourself</h2></div>
+    <p class="section-intro">For live AI dashboards and live calculations, run it on your own machine with a free <a href="https://aistudio.google.com">Gemini API key</a>.</p>
+    <div class="code-panel mono" style="margin-top:22px;"><span class="muted"># Python 3.12 or newer</span><br>
+git clone https://github.com/beingranjithm/data-analyst-agent.git<br>
+cd data-analyst-agent<br>
+python -m venv .venv &amp;&amp; source .venv/bin/activate<br>
+pip install -r requirements.txt<br>
+mkdir -p hello_agent<br>
+echo "GOOGLE_API_KEY=your-key-here" &gt; hello_agent/.env<br>
+streamlit run app/streamlit_app.py</div>
+    <p class="section-intro" style="margin-top:16px;">Full setup, architecture diagram and test notes are in the <a href="https://github.com/beingranjithm/data-analyst-agent#readme">README</a>. The Formula 1 demo set is a subset (2021–2022 seasons) of
+      <a href="https://www.kaggle.com/datasets/rohanrao/formula-1-world-championship-1950-2020">Formula 1 World Championship (1950–2024)</a>
+      by Rohan Rao on Kaggle, listed there as CC0: Public Domain, originally compiled from the Ergast F1 database.</p>
+  </div>
+</section>
+
+<section class="cta-band">
+  <div class="wrap">
+    <div>
+      <h2>Try it on your own data.</h2>
+      <p>Free, no sign-up. Bring your own Gemini key, or start on the Formula 1 demo set.</p>
+    </div>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://analystiq-agent.streamlit.app">Open the live demo</a>
+      <a class="btn btn-secondary" href="https://github.com/beingranjithm/data-analyst-agent">View the code</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>Built by Ranjithkumar with Google ADK, Gemini, pandas, Plotly and Streamlit.</p>
+    <div class="foot-links"><a href="https://github.com/beingranjithm/data-analyst-agent">Source on GitHub</a></div>
+  </div>
+</footer>
+
+</body>
+</html>
