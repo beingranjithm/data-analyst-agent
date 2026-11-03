@@ -247,17 +247,18 @@ def texts(at):
     return [e.value for e in list(at.info) + list(at.warning) + list(at.error) + list(at.caption)]
 
 
+SAMPLE_CSV = (ROOT / "sample_data" / "sales_sample.csv").read_bytes()
+
+
 def test_the_local_app_has_no_banner_no_key_box_and_the_sandbox_box(monkeypatch):
-    at = open_app(monkeypatch).run()
+    at = open_app(monkeypatch, files=[("sales_sample.csv", SAMPLE_CSV)]).run()
     assert not at.exception and not any("Public demo" in t for t in texts(at))
     assert not [t for t in at.sidebar.text_input if t.label == "Paste your key"]
-    at.sidebar.radio[0].set_value("Built-in sample sales data").run()
     assert any(t.label.startswith("Python code") for t in at.text_area)
 
 
 def test_the_hosted_app_shows_the_banner_and_key_box_and_no_python_box(hosted, monkeypatch):
-    at = open_app(monkeypatch).run()
-    at.sidebar.radio[0].set_value("Built-in sample sales data").run()
+    at = open_app(monkeypatch, files=[("sales_sample.csv", SAMPLE_CSV)]).run()
     assert not at.exception
     assert any("Public demo" in t for t in texts(at))
     assert [t for t in at.sidebar.text_input if t.label == "Paste your key"]

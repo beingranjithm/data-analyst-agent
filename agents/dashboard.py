@@ -16,8 +16,12 @@ from pydantic import ValidationError
 from agents.chart_loop import MAX_ATTEMPTS, make_chart_healing_async
 from agents.planner import DEFAULT_MODEL, plan_dashboard_async
 from agents.resilience import DEFAULT_DELAYS, describe_model_error, with_backoff
+from tools.change_cards import build_change_cards
 from tools.charts import build_chart, suggest_charts
+from tools.dashboard_header import coverage_subtitle, data_health_note, format_header_title
 from tools.figure_checks import check_figure
+from tools.insights import chart_insight_title
+from tools.kpi_deltas import compute_kpi_deltas, pick_comparison_window
 from tools.plan_kpis import KpiValue, compute_plan_kpis
 from tools.plan_schema import ChartSpec, DashboardPlan
 from tools.title_check import title_warnings
@@ -47,6 +51,11 @@ class Dashboard:
     kpis: list = field(default_factory=list)
     charts: list = field(default_factory=list)
     notes: list = field(default_factory=list)
+    coverage: str = ""                # Phase A: what the dashboard actually covers (dates/rows)
+    data_health: str = ""             # Phase A: one concrete, dataset-specific data-quality fact
+    north_star: Optional[str] = None  # Phase B: label of the headline KPI (the first one), if any
+    comparison_label: str = ""        # Phase B: e.g. "vs previous 30 days"; "" when no delta was usable
+    change_cards: list = field(default_factory=list)   # Phase C: grounded "what changed" cards
 
     @property
     def ok_charts(self) -> list:
@@ -75,14 +84,29 @@ def _gallery_plan(profile: dict, max_charts: Optional[int], notes: list) -> Dash
     return DashboardPlan(title="Dashboard", summary="Built by the rule-based chart gallery.", charts=charts)
 
 
-def _finish(fig, chart: ChartSpec):
-    """Check a figure. Returns (figure, blocking problems, warnings); fills in a missing title."""
+def _finish(fig, chart: ChartSpec, df: Optional[pd.DataFrame] = None):
+    """Check a figure. Returns (figure, blocking problems, warnings); fills in a missing title.
+
+    Phase A: when real data is available, the title is rewritten to a short, grounded sentence
+    stating what the chart actually shows (e.g. "Organic leads with 38% of revenue"), computed
+    straight from the data with the same discipline as tools/plan_kpis.py. If no confident
+    insight can be computed, the original title (AI or rule-based) is left as-is.
+    """
     check = check_figure(fig)
     if check.ok and check.missing_title:
         fig.update_layout(title_text=chart.title)
+    shown_title = chart.title
+    if check.ok and df is not None:
+        try:
+            insight = chart_insight_title(df, chart)
+        except Exception:               # an insight must never break the dashboard
+            insight = None
+        if insight:
+            shown_title = insight
+            fig.update_layout(title_text=shown_title)
     warnings = list(check.warnings)
     try:                                       # Day 20: does the title say what the chart measures?
-        shown = fig.layout.title.text if fig.layout.title and fig.layout.title.text else chart.title
+        shown = fig.layout.title.text if fig.layout.title and fig.layout.title.text else shown_title
         warnings += title_warnings(shown, getattr(chart, "measure", None))
     except Exception:
         pass
@@ -150,6 +174,18 @@ async def build_dashboard_async(df: pd.DataFrame, profile: dict, model=DEFAULT_M
     except Exception as e:
         kpis = []
         notes.append(f"KPIs could not be computed: {type(e).__name__}")
+    comparison_label = ""
+    try:                                        # Phase B: period-over-period deltas (graceful: {} when
+        deltas = compute_kpi_deltas(df, plan.kpis, profile)   # there's no usable date column/span)
+        if deltas:
+            window = pick_comparison_window(profile)
+            comparison_label = window.label if window else ""
+            for k in kpis:
+                d = deltas.get(k.label)
+                if d:
+                    k.delta_pct, k.delta_direction, k.delta_good = d.pct, d.direction, d.good
+    except Exception:                          # a delta must never break the dashboard
+        pass
 
     # ---- 3. the charts, one by one (free-tier friendly) ----
     ai_available = use_ai and mode == "ai"
@@ -162,7 +198,7 @@ async def build_dashboard_async(df: pd.DataFrame, profile: dict, model=DEFAULT_M
                                                   delays=delays, sleep=sleep, on_wait=on_wait)
             attempts, code = heal.attempts, heal.code
             if heal.ok:
-                fig, problems, warns = _finish(heal.figure, chart)
+                fig, problems, warns = _finish(heal.figure, chart, df)
                 if not problems:
                     outcomes.append(ChartOutcome(chart, True, fig, "ai", attempts, code,
                                                  f"Built by the AI on attempt {attempts}.", "", warns))
@@ -174,7 +210,7 @@ async def build_dashboard_async(df: pd.DataFrame, profile: dict, model=DEFAULT_M
                     ai_available = False      # the model service is down: stop waiting on it for later charts
                     notes.append("The AI model was unavailable, so the remaining charts use the rule-based builder.")
         try:
-            fig, problems, warns = _finish(build_chart(df, chart.to_spec()), chart)
+            fig, problems, warns = _finish(build_chart(df, chart.to_spec()), chart, df)
             error = "; ".join(problems)
         except Exception as e:
             fig, warns, error = None, [], f"{type(e).__name__}: {str(e)[:200]}"
@@ -185,7 +221,19 @@ async def build_dashboard_async(df: pd.DataFrame, profile: dict, model=DEFAULT_M
             msg = (f"AI: {ai_message} | " if ai_message else "") + f"Rule-based: {error}"
             outcomes.append(ChartOutcome(chart, False, None, "", attempts, code, msg, ai_message))
     emit("done", len(charts), len(charts), "Dashboard ready.")
-    return Dashboard(plan.title, plan.summary, len(df), mode, kpis, outcomes, notes)
+    try:                                        # Phase A: header framing + data-health banner
+        coverage = coverage_subtitle(profile)
+        health = data_health_note(profile)
+        header_title = format_header_title(plan.title)
+    except Exception:                          # never let header framing break the dashboard
+        coverage, health, header_title = "", "", plan.title
+    north_star = kpis[0].label if kpis else None
+    try:                                        # Phase C: grounded "what changed" cards (reuses Phase B's
+        change_cards = build_change_cards(kpis, comparison_label)   # already-computed, already-tested deltas)
+    except Exception:                          # a card must never break the dashboard
+        change_cards = []
+    return Dashboard(header_title, plan.summary, len(df), mode, kpis, outcomes, notes, coverage, health,
+                     north_star, comparison_label, change_cards)
 
 
 def build_dashboard(df: pd.DataFrame, profile: dict, model=DEFAULT_MODEL, **kw) -> Dashboard:

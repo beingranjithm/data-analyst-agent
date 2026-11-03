@@ -1,27 +1,26 @@
-"""Day 23b: the small F1 demo set, its questions, and recorded answers that replay in the app (fake models only)."""
+"""Day 25: the Olist e-commerce demo set in the app -- picking it, its starter questions, and recorded answers
+that replay in the app (fake models only). The demo set's own builder/shipped-file/true-answer tests live in
+tests/test_olist_eval.py; this file covers what's unique to the live app: AppTest-level selection, starters,
+and the record/replay plumbing around deploy/demo_cache.json."""
 import json
-import os
-import sys
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-import build_demo_f1 as bd  # noqa: E402
 import tools.hosting as hosting  # noqa: E402
 from agents.llm_cache import CachingLlm  # noqa: E402
 from agents.llm_factory import DEMO_CACHE_PATH, ROLE_MODELS, default_cache_path  # noqa: E402
 from agents.multi_chat import chat_session_for, prepare_chat  # noqa: E402
 from calc_fakes import FakeRun  # noqa: E402
-from evals.f1_eval import DEMO_DEFINITIONS, DEMO_QUESTIONS, build_demo_questions, read_raw  # noqa: E402
+from evals.olist_eval import DEMO_QUESTIONS  # noqa: E402
 from test_chat_agent import ScriptedLlm, _no_sleep  # noqa: E402
 from tools.relations import find_links  # noqa: E402
 
+import pytest
+from pathlib import Path
+
 ROOT = Path(__file__).resolve().parent.parent
-DEMO_DIR = ROOT / "sample_data" / "f1_demo"
+DEMO_DIR = ROOT / "sample_data" / "olist_demo"
 
 
 @pytest.fixture(autouse=True)
@@ -30,95 +29,6 @@ def clean(monkeypatch):
     monkeypatch.delenv("DAA_CACHE_PATH", raising=False)
     monkeypatch.setattr(hosting, "_secret_flag", lambda: False)
     hosting._PROBE.clear()
-
-
-# ------------------------------------------------------------------ the builder (tiny made-up files)
-def write_f1(folder: Path):
-    folder.mkdir(parents=True, exist_ok=True)
-    files = {
-        "seasons": "year,url\n2019,u\n2021,u\n2022,u\n",
-        "circuits": "circuitId,name,country\n1,Monaco,Monaco\n2,Monza,Italy\n3,Old,France\n",
-        "races": "raceId,year,round,circuitId,name\n10,2019,1,3,Old GP\n11,2021,1,1,Monaco Grand Prix\n12,2022,1,2,Italian Grand Prix\n13,2022,2,1,Monaco Grand Prix\n",
-        "drivers": "driverId,forename,surname\n1,Lewis,Hamilton\n2,Max,Verstappen\n3,Old,Timer\n",
-        "constructors": "constructorId,name\n1,Mercedes\n2,Red Bull\n3,Gone\n",
-        "status": "statusId,status\n1,Finished\n2,Retired\n3,Unused\n",
-        "results": "resultId,raceId,driverId,constructorId,position,points,statusId\n1,10,3,3,1,25,1\n2,11,1,1,1,25,1\n3,11,2,2,\\N,0,2\n4,12,2,2,1,25,1\n5,13,2,2,1,25,1\n",
-        "qualifying": "qualifyId,raceId,driverId,constructorId,position\n1,10,3,3,1\n2,12,1,1,1\n",
-        "pit_stops": "raceId,driverId,stop,milliseconds\n10,3,1,20000\n13,2,1,21000\n13,2,2,22000\n",
-        "lap_times": "raceId,driverId,lap,milliseconds\n10,3,1,90000\n11,1,1,91000\n12,2,1,92000\n13,2,1,93000\n",
-        "driver_standings": "driverStandingsId,raceId,driverId,points\n1,10,3,25\n2,12,2,25\n",
-        "constructor_standings": "constructorStandingsId,raceId,constructorId,points\n1,10,3,25\n2,12,2,25\n",
-        "constructor_results": "constructorResultsId,raceId,constructorId,points\n1,10,3,25\n2,12,2,25\n",
-        "sprint_results": "resultId,raceId,driverId,constructorId,position,points,statusId\n1,10,3,3,1,3,1\n2,12,2,2,1,3,1\n",
-    }
-    for n, text in files.items():
-        (folder / f"{n}.csv").write_text(text)
-
-
-def test_the_builder_keeps_only_the_chosen_seasons_and_what_they_point_to(tmp_path):
-    write_f1(tmp_path / "src")
-    counts = bd.build_demo(tmp_path / "src", tmp_path / "out", [2021, 2022])
-    assert counts["races"] == 3 and counts["seasons"] == 2 and counts["results"] == 4
-    assert counts["drivers"] == 2 and counts["constructors"] == 2 and counts["circuits"] == 2 and counts["status"] == 2
-    assert counts["qualifying"] == 1 and counts["pit_stops"] == 2 and counts["sprint_results"] == 1
-    out = {p.stem: pd.read_csv(p, dtype=str, keep_default_na=False) for p in (tmp_path / "out").glob("*.csv")}
-    assert set(out) == set(bd.ALL) and set(out["races"].year) == {"2021", "2022"}
-    assert set(out["drivers"].surname) == {"Hamilton", "Verstappen"}                  # the 2019-only driver is gone
-    assert set(out["circuits"].name) == {"Monaco", "Monza"}
-
-
-def test_the_builder_keeps_values_exactly_including_backslash_n(tmp_path):
-    write_f1(tmp_path / "src")
-    bd.build_demo(tmp_path / "src", tmp_path / "out", [2021])
-    assert "\\N" in (tmp_path / "out" / "results.csv").read_text()
-
-
-def test_every_link_between_the_tables_survives_the_cut(tmp_path):
-    write_f1(tmp_path / "src")
-    bd.build_demo(tmp_path / "src", tmp_path / "out", [2021, 2022])
-    frames = {p.stem: pd.read_csv(p, na_values=["\\N"]) for p in (tmp_path / "out").glob("*.csv")}
-    texts = {l.text() for l in find_links(frames)}
-    assert {"results.driverId → drivers.driverId", "results.raceId → races.raceId",
-            "races.circuitId → circuits.circuitId"} <= texts
-
-
-def test_the_builder_says_what_went_wrong(tmp_path):
-    write_f1(tmp_path / "src")
-    with pytest.raises(ValueError, match="No races found"):
-        bd.build_demo(tmp_path / "src", tmp_path / "out", [1950])
-    (tmp_path / "src" / "pit_stops.csv").unlink()
-    with pytest.raises(FileNotFoundError, match="pit_stops.csv"):
-        bd.build_demo(tmp_path / "src", tmp_path / "out", [2021])
-
-
-def test_a_rebuild_removes_files_from_an_earlier_build(tmp_path):
-    write_f1(tmp_path / "src")
-    (tmp_path / "out").mkdir()
-    (tmp_path / "out" / "old.csv").write_text("a\n1\n")
-    bd.build_demo(tmp_path / "src", tmp_path / "out", [2021])
-    assert not (tmp_path / "out" / "old.csv").exists()
-
-
-# ------------------------------------------------------------------ the shipped demo set and its questions
-def test_the_shipped_demo_set_is_small_complete_and_linked():
-    files = sorted(DEMO_DIR.glob("*.csv"))
-    assert {p.stem for p in files} == set(bd.ALL)
-    assert sum(p.stat().st_size for p in files) < 3_000_000
-    frames = {p.stem: pd.read_csv(p, na_values=["\\N"]) for p in files}
-    assert set(frames["races"].year) == {2021, 2022}
-    assert len(find_links(frames)) >= 20
-
-
-def test_the_demo_questions_all_have_true_answers_on_the_shipped_set():
-    qs, skipped = build_demo_questions(read_raw(DEMO_DIR))
-    assert skipped == [] and len(qs) == len(DEMO_DEFINITIONS) == len(DEMO_QUESTIONS) == len(set(DEMO_QUESTIONS))
-    by = {q.text: q.expect for q in qs}
-    assert by["How many races were held in 2022?"].numbers == [22]
-    assert by["Which driver won the most races in 2021, and how many?"].names == ["Verstappen"]
-    assert by["Which constructor won the most races in 2022, and how many?"].names == ["Red Bull"]
-    monaco = by["How many pit stops did the winner of the 2022 Monaco Grand Prix make, and who was it?"]
-    assert monaco.names == [("Pérez", "Perez")]                        # the accent is an allowed spelling difference
-    assert sum(q.expect.trap for q in qs) == 2
 
 
 # ------------------------------------------------------------------ where saved replies live
@@ -156,23 +66,23 @@ def starter_buttons(at):
     return [b.label for b in at.button if b.key and b.key.startswith("chat_starter_")]
 
 
-def test_locally_the_demo_is_one_choice_among_several(monkeypatch):
+def test_locally_the_demo_is_the_other_choice_besides_uploading(monkeypatch):
     monkeypatch.setenv("GOOGLE_API_KEY", "a-key-so-the-chat-opens")          # locally the chat needs a key unless 'Replay only'
     at = app(monkeypatch).run()
     radio = at.sidebar.radio[0]
-    assert radio.value == "Upload my own CSV" and "Formula 1 demo set (2021-2022)" in radio.options and "Messy test file" in radio.options
-    radio.set_value("Formula 1 demo set (2021-2022)").run()
+    assert radio.value == "Upload my own CSV" and radio.options == ["Upload my own CSV", "Olist e-commerce demo set (Nov 2017)"]
+    radio.set_value("Olist e-commerce demo set (Nov 2017)").run()
     assert not at.exception
     assert starter_buttons(at) == DEMO_QUESTIONS
     assert any("saved answers" in c.value for c in at.caption)
-    assert at.session_state["active_table"] == "results_flat" and len(at.session_state["tables"]) == 15
+    assert at.session_state["active_table"] == "order_items_flat" and len(at.session_state["tables"]) == 9
 
 
-def test_the_hosted_app_opens_on_the_demo_without_the_messy_file(monkeypatch):
+def test_the_hosted_app_opens_on_the_demo_with_only_the_two_sources(monkeypatch):
     at = app(monkeypatch, hosted=True).run()
     assert not at.exception
     radio = at.sidebar.radio[0]
-    assert radio.value == "Formula 1 demo set (2021-2022)" and "Messy test file" not in radio.options
+    assert radio.value == "Olist e-commerce demo set (Nov 2017)" and radio.options == ["Upload my own CSV", "Olist e-commerce demo set (Nov 2017)"]
     assert starter_buttons(at) == DEMO_QUESTIONS
     chat_modes = next(s for s in at.selectbox if s.key == "chat_cache_mode")
     assert chat_modes.value.startswith("Replay only")                        # no key needed to start
@@ -196,8 +106,11 @@ def test_without_the_sandbox_lock_a_live_ai_gets_no_demo_questions_and_no_data(m
 
 def test_other_data_gets_the_usual_starters_not_the_demo_ones(monkeypatch):
     monkeypatch.setenv("GOOGLE_API_KEY", "a-key-so-the-chat-opens")
-    at = app(monkeypatch).run()
-    at.sidebar.radio[0].set_value("Built-in sample sales data").run()
+    import streamlit as st
+    at = app(monkeypatch)
+    sample = (ROOT / "sample_data" / "sales_sample.csv").read_bytes()
+    monkeypatch.setattr(st, "file_uploader", lambda *a, **k: [U("sales_sample.csv", sample)])
+    at.run()
     assert not at.exception and starter_buttons(at) and not set(starter_buttons(at)) & set(DEMO_QUESTIONS)
 
 
@@ -216,8 +129,8 @@ def run_in_test_sandbox(code, tables, *, active=None, **kw):
     return FakeRun(value=r.item() if hasattr(r, "item") else r)
 
 
-CODE = '```python\nresult = df["raceId"].nunique()\n```'
-ANSWER = "There were 22 races in 2022."
+CODE = '```python\nresult = (df["order_status"] == "canceled").sum()\n```'
+ANSWER = "There were 37 canceled orders."
 
 
 def demo_files():
@@ -228,7 +141,7 @@ def test_answers_recorded_by_the_script_path_replay_in_the_app(monkeypatch, tmp_
     import tools.sandbox as sb
     monkeypatch.setattr(sb, "run_code", run_in_test_sandbox)
     cache = tmp_path / "demo_cache.json"
-    # 1) RECORD, the way scripts/eval_f1.py --demo does: its set-up code, a (fake) model behind the saved-replies cache
+    # 1) RECORD, the way scripts/eval_olist.py --demo does: its set-up code, a (fake) model behind the saved-replies cache
     prep = prepare_chat(demo_files())
     inner = ScriptedLlm(replies=[CODE, ANSWER], seen=[], systems=[])
     recorder = CachingLlm(model=ROLE_MODELS["chat"][0], inner=inner, mode="use", path=str(cache), min_interval=0)
@@ -254,15 +167,6 @@ def test_a_question_nobody_recorded_gets_a_friendly_message_not_a_crash(monkeypa
     next(b for b in at.button if b.label == DEMO_QUESTIONS[0]).click().run()
     assert not at.exception
     assert any("saved" in e.value.lower() or "replay" in e.value.lower() for e in at.error)
-
-
-def test_text_that_looks_like_missing_is_copied_untouched(tmp_path):
-    write_f1(tmp_path / "src")
-    d = tmp_path / "src" / "drivers.csv"
-    d.write_text(d.read_text().replace("Hamilton", "NA").replace("Verstappen", "null"))
-    bd.build_demo(tmp_path / "src", tmp_path / "out", [2021, 2022])
-    out = pd.read_csv(tmp_path / "out" / "drivers.csv", dtype=str, keep_default_na=False)
-    assert set(out.surname) == {"NA", "null"}
 
 
 def test_the_chat_set_up_uses_only_joinable_links():

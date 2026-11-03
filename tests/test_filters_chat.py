@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import streamlit as st
 from streamlit.testing.v1 import AppTest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -15,9 +16,18 @@ from calc_fakes import local_runner  # noqa: E402
 from ui import chat_tab  # noqa: E402
 
 HARNESS = str(Path(__file__).resolve().parent / "chat_scope_harness.py")
-APP = str(Path(__file__).resolve().parent.parent / "app" / "streamlit_app.py")
+ROOT = Path(__file__).resolve().parent.parent
+APP = str(ROOT / "app" / "streamlit_app.py")
 SCOPE = "region: East, West (20 of 40 rows)"
 CODE = "```python\nresult = int(len(df))\n```"
+
+
+class U:
+    def __init__(self, name, data):
+        self.name, self._data, self.size = name, data, len(data)
+
+    def getvalue(self):
+        return self._data
 
 
 @pytest.fixture
@@ -78,9 +88,10 @@ def test_in_the_whole_app_the_chat_calculates_on_the_filtered_rows_and_starts_fr
                            scope=settings.get("scope", ""))
     monkeypatch.setattr(chat_tab, "api_key_available", lambda: True)
     monkeypatch.setattr(chat_tab, "default_session_factory", factory)
+    sample = (ROOT / "sample_data" / "sales_sample.csv").read_bytes()
+    monkeypatch.setattr(st, "file_uploader", lambda *a, **k: [U("sales_sample.csv", sample)])
     at = AppTest.from_file(APP, default_timeout=90)
-    at.run()
-    at.sidebar.radio[0].set_value("Built-in sample sales data").run()
+    at.run()                        # "Upload my own CSV" is the default source; the mocked upload loads immediately
     assert not at.exception
     box = at.sidebar.multiselect[0]
     column, options = box.label, list(box.options)

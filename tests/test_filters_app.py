@@ -2,6 +2,7 @@
 import sys
 from pathlib import Path
 
+import streamlit as st
 from streamlit.testing.v1 import AppTest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -9,13 +10,23 @@ import tools.charts as charts_mod  # noqa: E402
 import tools.sandbox as sandbox_mod  # noqa: E402
 from ui import dashboard_tab  # noqa: E402
 
-APP = str(Path(__file__).resolve().parent.parent / "app" / "streamlit_app.py")
+ROOT = Path(__file__).resolve().parent.parent
+APP = str(ROOT / "app" / "streamlit_app.py")
 
 
-def sample_app():
+class U:
+    def __init__(self, name, data):
+        self.name, self._data, self.size = name, data, len(data)
+
+    def getvalue(self):
+        return self._data
+
+
+def sample_app(monkeypatch):
+    sample = (ROOT / "sample_data" / "sales_sample.csv").read_bytes()
+    monkeypatch.setattr(st, "file_uploader", lambda *a, **k: [U("sales_sample.csv", sample)])
     at = AppTest.from_file(APP, default_timeout=90)
-    at.run()
-    at.sidebar.radio[0].set_value("Built-in sample sales data").run()
+    at.run()                        # "Upload my own CSV" is the default source; the mocked upload loads immediately
     assert not at.exception and not any("Filter on" in i.value for i in at.sidebar.info)     # nothing is carried over
     return at
 
@@ -24,7 +35,7 @@ def test_the_app_without_any_filter_behaves_as_before(monkeypatch):
     rows = []
     real = charts_mod.compute_kpis
     monkeypatch.setattr(charts_mod, "compute_kpis", lambda df, profile: (rows.append(len(df)), real(df, profile))[1])
-    at = sample_app()
+    at = sample_app(monkeypatch)
     total = int(at.metric[0].value.replace(",", ""))
     assert rows and rows[-1] == total and not any("Filter on" in i.value for i in at.sidebar.info)
 
@@ -35,7 +46,7 @@ def test_the_gallery_and_the_ai_dashboard_use_the_filtered_rows_but_the_overview
     monkeypatch.setattr(charts_mod, "compute_kpis", lambda df, profile: (kpi_rows.append(len(df)), real(df, profile))[1])
     monkeypatch.setattr(dashboard_tab, "default_session_factory",
                         lambda df, profile, settings, progress: dash.append((len(df), profile["dataset"]["rows"])) or None)
-    at = sample_app()
+    at = sample_app(monkeypatch)
     total = int(at.metric[0].value.replace(",", ""))
     box = at.sidebar.multiselect[0]
     dropped = list(box.options)[0]
@@ -61,7 +72,7 @@ def test_the_ai_dashboard_plans_from_the_full_summary_but_builds_on_the_filtered
         raise Stop()
     monkeypatch.setattr(dashboard_tab, "default_session_factory", factory)
     monkeypatch.setattr(dashboard_tab, "api_key_available", lambda: True)
-    at = sample_app()
+    at = sample_app(monkeypatch)
     total = int(at.metric[0].value.replace(",", ""))
     box = at.sidebar.multiselect[0]
     box.unselect(list(box.options)[0]).run()
@@ -69,8 +80,8 @@ def test_the_ai_dashboard_plans_from_the_full_summary_but_builds_on_the_filtered
     assert seen and seen[-1][0] < total and seen[-1][1] == total                           # rows: filtered, summary: full
 
 
-def test_a_filter_that_matches_nothing_gives_a_clear_message_instead_of_a_crash():
-    at = sample_app()
+def test_a_filter_that_matches_nothing_gives_a_clear_message_instead_of_a_crash(monkeypatch):
+    at = sample_app(monkeypatch)
     box = at.sidebar.multiselect[0]
     for v in list(box.options):
         box = at.sidebar.multiselect[0]

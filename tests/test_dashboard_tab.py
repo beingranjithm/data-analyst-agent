@@ -29,7 +29,7 @@ def to_review(scenario="ok"):
 def texts(at):
     return " ".join(str(getattr(e, "value", "")) for e in
                     list(at.markdown) + list(at.caption) + list(at.info) + list(at.error) + list(at.warning)
-                    + list(at.subheader))
+                    + list(at.success) + list(at.subheader))
 
 
 def charts(at):
@@ -57,10 +57,18 @@ def test_building_everything_shows_kpis_charts_and_a_download():
     at = to_review()
     at.button(key="ai_build").click().run()
     assert not at.exception and at.session_state["ai_stage"] == "done"
-    assert charts(at) == 3 and at.subheader[0].value == "Sales"
-    assert at.metric[0].label == "Revenue" and at.metric[0].value not in ("n/a", "")
+    assert charts(at) == 3 and at.subheader[0].value == "Sales overview"
+    assert at.metric[0].label == "⭐ Revenue" and at.metric[0].value not in ("n/a", "")
     assert len(at.get("download_button")) == 1
     assert "AI requests in this run" in texts(at)
+
+
+def test_the_single_kpi_renders_in_one_row_with_no_change_cards_for_a_dateless_dataset():
+    # the shared test dataset has no date column, so Phase B/C have nothing to compare against
+    at = to_review()
+    at.button(key="ai_build").click().run()
+    assert len(at.metric) == 1                        # all KPIs (here, just one) in a single row
+    assert "What changed" not in texts(at)             # no usable delta -> no change cards at all
 
 
 def test_an_unticked_chart_is_not_built():
@@ -76,7 +84,7 @@ def test_the_title_can_be_changed_and_an_empty_title_is_refused():
     at = to_review()
     at.text_input(key="ai_title_1").set_value("Board pack")
     at.button(key="ai_build").click().run()
-    assert at.subheader[0].value == "Board pack"
+    assert at.subheader[0].value == "Board pack overview"
 
     at2 = to_review()
     at2.text_input(key="ai_title_1").set_value("   ")
@@ -157,6 +165,57 @@ def test_without_ai_the_tab_uses_the_rule_based_gallery_and_no_model():
 def test_kpi_formatting():
     assert tab.format_kpi(None) == "n/a" and tab.format_kpi(1708450.5) == "1,708,450"
     assert tab.format_kpi(6094.0) == "6,094" and tab.format_kpi(0.05) == "0.05" and tab.format_kpi(294.27) == "294.27"
+
+
+class _K:
+    def __init__(self, delta_pct=None, delta_direction=None, delta_good=None):
+        self.delta_pct, self.delta_direction, self.delta_good = delta_pct, delta_direction, delta_good
+
+
+def test_kpi_delta_display_is_off_with_no_usable_delta():
+    assert tab.kpi_delta_display(_K(), "vs previous 30 days") == (None, "off")
+
+
+def test_kpi_delta_display_is_off_for_a_flat_change():
+    assert tab.kpi_delta_display(_K(0.4, "flat", None), "vs previous 30 days") == (
+        "+0.4% vs previous 30 days", "off")
+
+
+def test_kpi_delta_display_is_normal_when_a_rise_is_good():
+    text, color = tab.kpi_delta_display(_K(12.3, "up", True), "vs previous 30 days")
+    assert text == "+12.3% vs previous 30 days" and color == "normal"
+
+
+def test_kpi_delta_display_is_inverse_when_a_rise_is_bad():
+    text, color = tab.kpi_delta_display(_K(12.3, "up", False), "vs previous 30 days")
+    assert color == "inverse"
+
+
+def test_kpi_delta_display_is_normal_when_a_fall_is_bad():
+    text, color = tab.kpi_delta_display(_K(-8.0, "down", False), "vs previous 30 days")
+    assert text == "-8.0% vs previous 30 days" and color == "normal"
+
+
+def test_kpi_delta_display_is_inverse_when_a_fall_is_good():
+    text, color = tab.kpi_delta_display(_K(-8.0, "down", True), "vs previous 30 days")
+    assert color == "inverse"
+
+
+class _Kpi:
+    def __init__(self, label):
+        self.label = label
+
+
+def test_kpi_label_for_stars_only_the_north_star_metric():
+    assert tab.kpi_label_for(_Kpi("Revenue"), "Revenue") == "⭐ Revenue"
+    assert tab.kpi_label_for(_Kpi("Orders"), "Revenue") == "Orders"
+    assert tab.kpi_label_for(_Kpi("Revenue"), None) == "Revenue"
+
+
+def test_change_card_style_covers_every_tag():
+    assert set(tab.CHANGE_CARD_STYLE) == {"Win", "Risk", "Watch"}
+    assert all(isinstance(icon, str) and isinstance(color, str)
+              for icon, color in tab.CHANGE_CARD_STYLE.values())
 
 
 def test_usage_counts_requests_and_replays(tmp_path):

@@ -38,6 +38,53 @@ def format_kpi(value) -> str:
     return f"{value:,.2f}"
 
 
+def kpi_delta_display(k, comparison_label: str):
+    """(delta text, delta_color) for st.metric from a KpiValue's Phase B delta fields.
+    ("", "off") when there's no usable delta (no date column, not enough span, or flat)."""
+    if k.delta_pct is None or k.delta_direction is None:
+        return None, "off"
+    text = f"{k.delta_pct:+.1f}% {comparison_label}".strip()
+    if k.delta_direction == "flat" or k.delta_good is None:
+        return text, "off"
+    color = "normal" if (k.delta_direction == "up") == k.delta_good else "inverse"
+    return text, color
+
+
+# Phase D: clean, bordered, one-row layout (all KPIs on one line, "what changed" above them)
+CHANGE_CARD_STYLE = {"Win": ("↗️", "green"), "Risk": ("⚠️", "red"),
+                     "Watch": ("\U0001f441️", "orange")}
+
+
+def kpi_label_for(k, north_star) -> str:
+    """The display label for one KPI tile: a star prefix for the north-star metric."""
+    return f"⭐ {k.label}" if north_star and k.label == north_star else k.label
+
+
+def render_kpi_row(kpis, north_star, comparison_label):
+    """All KPIs in a single row of equal, bordered tiles; the north-star metric gets a star."""
+    if not kpis:
+        return
+    for col, k in zip(st.columns(len(kpis)), kpis):
+        with col, st.container(border=True):
+            delta, color = kpi_delta_display(k, comparison_label)
+            exact = "" if k.value is None else f"Exact: {k.value:,.2f}"
+            st.metric(kpi_label_for(k, north_star), format_kpi(k.value), delta=delta, delta_color=color,
+                     help=" · ".join(x for x in (exact, k.note) if x) or None)
+
+
+def render_change_cards(cards):
+    """The "What changed" section: one bordered card, one column per Win/Risk/Watch card."""
+    if not cards:
+        return
+    with st.container(border=True):
+        st.markdown("\U0001f4a1 **What changed**")
+        for col, card in zip(st.columns(len(cards)), cards):
+            icon, color = CHANGE_CARD_STYLE.get(card.tag, ("•", "gray"))
+            with col:
+                st.markdown(f":{color}[{icon} **{card.tag}**]")
+                st.caption(card.text)
+
+
 def usage_of(llm) -> tuple[int, int]:
     """(real requests, replayed from cache) for a CachingLlm, a FallbackLlm chain, or None."""
     if llm is None:
@@ -231,18 +278,19 @@ def _done():
         _clear_run()
         st.rerun()
     st.subheader(d.title)
+    if d.coverage:
+        st.caption(d.coverage)
     if d.summary:
         st.write(d.summary)
+    if d.data_health:
+        st.info(d.data_health)
     st.caption(f"{d.rows:,} rows · planned: {d.mode}")
     for note in d.notes:
         st.info(note)
-    if d.kpis:
-        for col, k in zip(st.columns(len(d.kpis)), d.kpis):
-            exact = "" if k.value is None else f"Exact: {k.value:,.2f}"
-            col.metric(k.label, format_kpi(k.value), help=" · ".join(x for x in (exact, k.note) if x) or None)
+    render_kpi_row(d.kpis, d.north_star, d.comparison_label)
     left, right = st.columns(2)
     for i, c in enumerate(d.ok_charts):
-        with (left if i % 2 == 0 else right):
+        with (left if i % 2 == 0 else right), st.container(border=True):
             st.plotly_chart(c.figure, key=f"ai_chart_{i}")
             badge = "🤖 AI-written" if c.source == "ai" else "📐 rule-based"
             st.caption(f"{badge} · {c.spec.why}" if c.spec.why else badge)
@@ -258,6 +306,7 @@ def _done():
                     st.code(c.code, language="python")
     for c in d.failed_charts:
         st.warning(f"Skipped chart '{c.spec.title}': {_safe(c.message[:300])}")
+    render_change_cards(d.change_cards)  # Phase D fix: "what changed" sits below the charts, not above the KPIs
     models = getattr(session, "models", None)
     if models:
         real = sum(usage_of(m)[0] for m in models)

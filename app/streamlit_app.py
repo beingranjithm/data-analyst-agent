@@ -29,8 +29,8 @@ render_hosted_sidebar()                                   # Day 23a: banner + th
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE_PATH = ROOT / "sample_data" / "sales_sample.csv"
 MESSY_DIR = ROOT / "sample_data" / "messy"
-DEMO_DIR = ROOT / "sample_data" / "f1_demo"                 # Day 23b: the small Formula 1 demo set
-DEMO_LABEL = "Formula 1 demo set (2021-2022)"
+DEMO_DIR = ROOT / "sample_data" / "olist_demo"              # Day 25: the small Olist e-commerce demo set
+DEMO_LABEL = "Olist e-commerce demo set (Nov 2017)"
 MAX_MB = file_limit_mb(50)
 ROLE_LABELS = {
     "numeric": "🔢 numeric", "datetime": "📅 date/time", "categorical": "🏷️ category",
@@ -62,7 +62,11 @@ st.caption("Upload a CSV, or pick a built-in file. The '✨ AI dashboard' tab pl
            "every number. Filters are in the sidebar.")  # Day 20
 
 # ---- choose the data source ----
-SOURCES = ["Upload my own CSV", "Built-in sample sales data", DEMO_LABEL] + ([] if is_hosted() else ["Messy test file"])
+# Day 25d: "Built-in sample sales data" and "Messy test file" were only convenience pickers for trying the app
+# without a file of your own; they never added any capability -- a messy file uploaded through "Upload my own
+# CSV" is cleaned the exact same way (tools/multi.py always runs it through clean_dataframe). Removed as options;
+# sample_data/sales_sample.csv and sample_data/messy/ stay on disk as fixtures the tests upload directly.
+SOURCES = ["Upload my own CSV", DEMO_LABEL]
 source = st.sidebar.radio("Data source", SOURCES, index=SOURCES.index(DEMO_LABEL) if is_hosted() else 0,
                               key="data_source")
 name, data, batch = None, None, None
@@ -70,18 +74,9 @@ name, data, batch = None, None, None
 if source == DEMO_LABEL:                                    # Day 23b: several linked tables to try for free
     demo_files = sorted(DEMO_DIR.glob("*.csv"))
     if not demo_files:
-        st.warning("The demo files are missing. Run: python scripts/build_demo_f1.py <folder with the 14 F1 files>")
+        st.warning("The demo files are missing. Run: python scripts/build_demo_olist.py <folder with the 8 Olist files>")
         st.stop()
     batch = [(p.name, p.read_bytes()) for p in demo_files]
-elif source == "Built-in sample sales data":
-    name, data = "sales_sample", SAMPLE_PATH.read_bytes()
-elif source == "Messy test file":
-    files = sorted(MESSY_DIR.glob("*.csv"))
-    if not files:
-        st.warning("No messy files found. Run: python sample_data/make_messy_files.py")
-        st.stop()
-    pick = st.sidebar.selectbox("Pick a file", [f.name for f in files])
-    name, data = Path(pick).stem, (MESSY_DIR / pick).read_bytes()
 else:
     uploaded = st.file_uploader("Upload one CSV file, or several files that belong together", type=["csv"],
                                 accept_multiple_files=True)          # Day 21: several files = several linked tables
@@ -352,7 +347,7 @@ with tab_chat:
             calc_live = False
             st.warning(f"Live calculations are switched off on this host ({_why}). The saved demo answers still work "
                        "with 'Replay only'. With your own key the chat answers from the data summary only.")
-    from evals.f1_eval import DEMO_QUESTIONS
+    from evals.olist_eval import DEMO_QUESTIONS
     demo_starters = DEMO_QUESTIONS if (source == DEMO_LABEL and chat_df is not None and not filter_label) else None
     render_chat(profile, data_key=base_key + ("|" + filter_sig if filter_sig else ""), df=chat_df, scope=filter_label,
                 multi=multi, starters=demo_starters, calc_live=calc_live)

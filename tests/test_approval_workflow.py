@@ -99,7 +99,7 @@ def test_approving_everything_builds_all_charts_without_planning_again(df):
     s, planner_llm, chart_llm = make(df, THREE, THREE_CODES)
     s.start()
     d = s.decide(ApprovalDecision())
-    assert s.state == "done" and d is s.dashboard and d.mode == "ai" and d.title == "Sales"
+    assert s.state == "done" and d is s.dashboard and d.mode == "ai" and d.title == "Sales overview"
     assert len(d.ok_charts) == 3 and [c.source for c in d.charts] == ["ai"] * 3 and d.kpis[0].value == 100.0
     assert planner_llm.calls == 1 and chart_llm.calls == 3
 
@@ -115,7 +115,7 @@ def test_a_dropped_chart_is_never_built(df):
 def test_the_title_can_be_changed(df):
     s, _, _ = make(df, [plan_json(BAR)], [GOOD_BAR])
     s.start()
-    assert s.decide(ApprovalDecision(title="  Board pack  ")).title == "Board pack"
+    assert s.decide(ApprovalDecision(title="  Board pack  ")).title == "Board pack overview"
 
 
 def test_cancelling_builds_nothing(df):

@@ -90,9 +90,40 @@ def run(df, sleeps, replies, **kw):
     return llm, build_dashboard(df, PROFILE, model=llm, sleep=fake_sleep, **kw)
 
 
+TIME_PROFILE = {"dataset": {"rows": 60, "columns": 2}, "time_column": "d", "columns": [
+    {"name": "d", "role": "datetime", "min": "2026-01-01", "max": "2026-03-01", "span_days": 60},
+    {"name": "revenue", "role": "numeric"}]}
+
+
+def test_kpis_get_a_period_over_period_delta_when_a_usable_date_column_exists(fake_tools, sleeps):
+    time_df = pd.DataFrame({"d": pd.date_range("2026-01-01", periods=60, freq="D"),
+                            "revenue": [10.0] * 30 + [20.0] * 30})
+
+    async def fake_sleep(seconds):
+        sleeps.append(seconds)
+    llm = ScriptedLlm(replies=[plan_json(HIST), GOOD_HIST])
+    d = build_dashboard(time_df, TIME_PROFILE, model=llm, sleep=fake_sleep)
+    assert d.north_star == "Revenue" and d.comparison_label == "vs previous 30 days"
+    assert d.kpis[0].delta_direction == "up" and d.kpis[0].delta_good is True
+    assert d.kpis[0].delta_pct == 100.0
+    assert len(d.change_cards) == 1
+    assert d.change_cards[0].tag == "Win" and d.change_cards[0].text == "Revenue rose 100.0% vs previous 30 days."
+
+
+def test_no_change_cards_when_there_is_no_usable_date_column(df, sleeps):
+    llm, d = run(df, sleeps, [plan_json(HIST), GOOD_HIST])
+    assert d.change_cards == []
+
+
+def test_no_delta_and_no_north_star_crash_when_there_is_no_usable_date_column(df, sleeps):
+    llm, d = run(df, sleeps, [plan_json(BAR, HIST), GOOD_BAR, GOOD_HIST])
+    assert d.north_star == "Revenue" and d.comparison_label == ""
+    assert d.kpis[0].delta_pct is None and d.kpis[0].delta_direction is None
+
+
 def test_happy_path_ai(df, sleeps):
     llm, d = run(df, sleeps, [plan_json(BAR, HIST), GOOD_BAR, GOOD_HIST])
-    assert d.mode == "ai" and d.title == "Sales" and d.rows == 4 and not d.notes
+    assert d.mode == "ai" and d.title == "Sales overview" and d.rows == 4 and not d.notes
     assert [c.source for c in d.charts] == ["ai", "ai"] and len(d.ok_charts) == 2 and not d.failed_charts
     assert d.kpis[0].label == "Revenue" and d.kpis[0].value == 100.0
     assert d.charts[1].figure.layout.title.text == "Revenue distribution"      # missing title was filled in

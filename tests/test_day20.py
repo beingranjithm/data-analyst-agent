@@ -165,11 +165,22 @@ def test_kpi_text_from_the_data_is_escaped():
 
 
 def test_the_gallery_in_the_real_app_writes_long_kpi_values_out_in_full(monkeypatch):
+    import streamlit as st
+
     import tools.charts as charts
+
+    class U:
+        def __init__(self, name, data):
+            self.name, self._data, self.size = name, data, len(data)
+
+        def getvalue(self):
+            return self._data
+
     monkeypatch.setattr(charts, "compute_kpis", lambda df, profile: [
         {"label": "Rows", "value": "600"}, {"label": "Date range", "value": "2025-01-01 to 2025-12-31"}])
+    sample = (ROOT / "sample_data" / "sales_sample.csv").read_bytes()
+    monkeypatch.setattr(st, "file_uploader", lambda *a, **k: [U("sales_sample.csv", sample)])
     at = AppTest.from_file(str(ROOT / "app" / "streamlit_app.py"), default_timeout=90).run()
-    at.sidebar.radio[0].set_value("Built-in sample sales data").run()
     assert not at.exception
     assert any("2025-01-01 to 2025-12-31" in m.value for m in at.markdown)
     assert "600" in [m.value for m in at.metric] and "2025-01-01 to 2025-12-31" not in [m.value for m in at.metric]

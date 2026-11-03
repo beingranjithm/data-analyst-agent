@@ -16,6 +16,11 @@ class KpiValue:
     measure: str
     value: Optional[float]       # None when it could not be computed
     note: str = ""               # e.g. "15 rows with a missing value left out"
+    # Phase B: period-over-period delta (tools/kpi_deltas.py). None/None/None when there is no
+    # usable date column, not enough span to compare, or the comparison could not be computed.
+    delta_pct: Optional[float] = None
+    delta_direction: Optional[str] = None   # "up", "down" or "flat"
+    delta_good: Optional[bool] = None       # True/False to color it; None when flat (shown neutral)
 
 
 def compute_plan_kpis(df: pd.DataFrame, kpis) -> list[KpiValue]:

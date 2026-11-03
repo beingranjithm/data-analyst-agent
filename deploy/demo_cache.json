@@ -168,5 +168,130 @@
   "text": "```python\n# Aggregate points by races_year\nagg_df = df.groupby('races_year')['points'].sum().reset_index()\n\n# Create the donut chart\nfig = px.pie(\n    agg_df,\n    names='races_year',\n    values='points',\n    title='Share of Total Points by Season Year',\n    hole=0.4,\n)\n\n# Update layout for proper display styling\nfig.update_layout(\n    title_x=0.5,\n    legend_title='Season Year',\n    margin=dict(t=60, b=40, l=40, r=40)\n)\n\nfig.update_traces(textinfo='percent+label')\n```",
   "model": "gemini-3.5-flash-lite",
   "saved": "2026-10-28T14:34:07+00:00"
+ },
+ "0110155f9694687147ef7fa2097e70b02bb7261fdfb9bab1947a6ce4e4358c0d": {
+  "text": "```python\ncanceled_count = (tables['orders']['order_status'] == 'canceled').sum()\ntotal_orders = len(tables['orders'])\nresult = pd.Series({'canceled_orders': canceled_count, 'total_orders': total_orders})\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:07:04+00:00"
+ },
+ "1bf8e3dd709851bc8943c3c21c52d300dd05528351735d26484ce901ee3b9a3d": {
+  "text": "Out of 7,544 total orders, 37 orders have the status 'canceled'.",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:07:06+00:00"
+ },
+ "eb0bd5320c619a5f0b18402a7c5ad80a33330c613416e09d2ae33984b59885a0": {
+  "text": "Based on the dataset profile, there are 965 distinct sellers (the seller_id column has many distinct values, specifically 965).",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:07:10+00:00"
+ },
+ "6883c22ee88c8ce04e8cb1c7674c606428641f22a014fb4503fe79bfd168da50": {
+  "text": "```python\norders_df = tables['orders']\nlate_orders = orders_df[orders_df['order_delivered_customer_date'] > orders_df['order_estimated_delivery_date']]\nresult = len(late_orders)\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:07:38+00:00"
+ },
+ "e80585ed2a25b438e9b5f06fb05cf282872e4ad3b6d4957b206911cb7c835f02": {
+  "text": "Out of the orders in the dataset, 1,043 orders were delivered later than their estimated delivery date.",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:07:40+00:00"
+ },
+ "1936279292a8279b045b988f968d85749e52a15744fcbe3349db51157a8b2509": {
+  "text": "```python\ntop_category = df['product_category_name_english'].value_counts().head(1)\nresult = pd.Series({\n    'category': top_category.index[0],\n    'count': top_category.iloc[0]\n})\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:07:44+00:00"
+ },
+ "e3fb559b372df01825be7219c36f5d48bbdedc1070279e0eb7a7965564b95f9e": {
+  "text": "The product category that appears in the most order items is bed_bath_table, with a total of 975 items.",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:07:48+00:00"
+ },
+ "0813ef6bdd6fe44260623bd41472188eaf2536fc32e1f9f277c41480d6c316ac": {
+  "text": "```python\nresult = df['seller_state'].value_counts().head(1)\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:07:55+00:00"
+ },
+ "ab59188723285004c42d88be39c6e14f23980e8a1f9ed5fac00cfe1887ff5fd4": {
+  "text": "The seller state that shipped the most order items is SP (S\u00e3o Paulo), with a total of 6,238 items shipped.",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:07:58+00:00"
+ },
+ "a856748da18940f3dc3bd05d2de5a6070763916bf9aa0c93489d05d9fea8fffd": {
+  "text": "```python\ncustomers_df = tables['customers']\nmerged = df.merge(customers_df, on='customer_id', how='left')\ncounts = merged.groupby('customer_state')['order_id'].nunique()\ntop_state = counts.idxmax()\ntop_count = counts.max()\nresult = pd.Series(dict(state=top_state, orders=top_count))\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:08:02+00:00"
+ },
+ "ac626f76c84a345ee086d3c43de28d49e8174ef5a7a7e9a4586129fd59e38ce1": {
+  "text": "```python\nresult = tables['order_payments']['payment_value'].sum()\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:08:11+00:00"
+ },
+ "78ea9194d46853cb46b08e5815b70a23f0e6ae529ea9362056f631769a0e4af9": {
+  "text": "The total value recorded in order payments is 1,194,882.80.",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:08:15+00:00"
+ },
+ "2e72ebdd804e59bba1d8f1b5608108490ea7b1718e0a9dea275b31680322f426": {
+  "text": "```python\nreviews_df = tables['order_reviews']\nscore_5_count = int((reviews_df['review_score'] == 5).sum())\ntotal_reviews = int(len(reviews_df))\nresult = pd.Series(dict(score_5_count=score_5_count, total_reviews=total_reviews))\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:08:20+00:00"
+ },
+ "cd8e3dde3ada21ed813ad5319f373b55ef051c68537f3ef02fe6fbdaf80c21ba": {
+  "text": "Out of 7,598 total reviews in the dataset, 3,992 reviews have a score of 5.",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:08:26+00:00"
+ },
+ "8940ea6679f90e8385cc05844a5d763ffcdaf423d8a488c92e686f350750ca62": {
+  "text": "```python\nresult = tables['order_reviews']['review_score'].mean()\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:08:29+00:00"
+ },
+ "0eea827173d7fa1d05d655a6a5a4a38d987add74e5549f68f6c127c30dff913b": {
+  "text": "The average review score across all 7,598 reviews in the dataset is approximately 3.89 out of 5.",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:08:34+00:00"
+ },
+ "ecd0c346df2a33f4c9b7be1f81602714a0c2fcb089a527ecbf47998f0585d8fb": {
+  "text": "```python\nresult = tables['order_payments']['payment_type'].value_counts()\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:08:38+00:00"
+ },
+ "ffab98424b40480a5d1a76b3b12f6dfc0d88fd6618f27ba1f38a90620900b5fa": {
+  "text": "The payment type used the most is credit_card, with a total of 5,897 times.",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:08:42+00:00"
+ },
+ "eec11742f34674f4ac8fa1f53c899939c16708f65a1da7b38602ccbf9dc681c4": {
+  "text": "```python\norders_table = tables['order_payments']\nreviews_table = tables['order_reviews']\n\ncc_orders = orders_table[orders_table['payment_type'] == 'credit_card']['order_id'].unique()\nbad_reviews = reviews_table[reviews_table['review_score'] == 1]['order_id'].unique()\n\nmatching_orders = set(cc_orders).intersection(set(bad_reviews))\nresult = len(matching_orders)\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:08:48+00:00"
+ },
+ "d4e9b8f3428d529e1b1613c29467d7dc4b5cb8e472130ff5ef549481be22cd9d": {
+  "text": "There are 919 orders that were paid by credit card and also received a review score of 1.",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:08:51+00:00"
+ },
+ "1b94a65de7829de52620730075e3cd2e1663da5f70058e7eff8af0ea0b4ff013": {
+  "text": "```python\nhealth_beauty_orders = df[df['product_category_name_english'] == 'health_beauty']['order_id'].unique()\norders_reviews = tables['order_reviews']\nmerged = orders_reviews[orders_reviews['order_id'].isin(health_beauty_orders)]\navg_score = merged['review_score'].mean()\nrows_matched = len(merged)\nresult = pd.Series({'average_review_score': avg_score, 'rows_matched': rows_matched})\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:08:56+00:00"
+ },
+ "e1818f1219d121a8ee522e7369f3fd81a32af10edf03cee012f93223857ef285": {
+  "text": "The average review score for orders containing a health_beauty item is 4.11, based on 531 matching review rows.",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:09:00+00:00"
+ },
+ "305688bf2a37cd81ba77c188ce4c672417f9bf08d9a25f4e6a7ee644e6e9e641": {
+  "text": "The dataset does not contain any information about customer age. It includes details about orders, products, sellers, payments, reviews, freight values, and delivery dates, but no demographic data for customers.",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:09:05+00:00"
+ },
+ "187efd4683808f978782bfacb923b0bd6de948ed0e9f77f78c0fa617b537c302": {
+  "text": "```python\nmatched = df[(df['order_purchase_timestamp'].dt.year == 2025)]\nresult = pd.Series(dict(\n    orders_count=matched['order_id'].nunique(),\n    rows_matched=len(matched)\n))\n```",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:09:09+00:00"
+ },
+ "90f5380c5a0af5979c6554b62e2b5ec1abc92e7786dacdc2082447905792d628": {
+  "text": "No orders were placed in 2025. According to the dataset profile, the purchase dates only range from November 1, 2017, to November 30, 2017.",
+  "model": "gemini-3.5-flash-lite",
+  "saved": "2026-11-03T13:09:14+00:00"
  }
 }
