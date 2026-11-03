@@ -24,3 +24,4 @@ uploads/
 
 # Day 23b: the small public F1 demo set
 !sample_data/f1_demo/*.csv
+!sample_data/olist_demo/*.csv
