@@ -4,7 +4,8 @@ Upload one or more CSV files and get an **AI-planned dashboard** you approve cha
 questions about your data and shows the calculation behind every number.
 
 **Live demo (free, no sign-up): https://analystiq-agent.streamlit.app**
-It opens on a small Formula 1 data set. The saved demo questions and the demo dashboard work without any key.
+It opens on a small Olist e-commerce data set (Brazilian orders, Oct-Nov 2017). The saved demo questions and the demo
+dashboard work without any key.
 On the free host, a visitor's own free [Gemini API key](https://aistudio.google.com) lets the chat answer questions about an
 uploaded file from its data summary. Live AI dashboards and live calculations on your own data need a host that supports the
 sandbox's file-system lock, so for those run the app yourself (see "Run it on your own computer").
@@ -60,23 +61,23 @@ Accuracy is measured against answers computed independently with plain pandas on
 
 | Test | Questions | Result |
 |---|---|---|
-| Formula 1, all 14 tables (1950 onwards), several tables per question | 18 | 16/18 on the first run, 17/18 after one fix, **18/18** after a second fix |
-| Formula 1 demo subset (2021 and 2022), answered from saved replies | 11 | **11/11**, 0 requests to Google on replay |
+| Olist e-commerce demo set (Oct-Nov 2017), several tables per question, answered live by Gemini | 14 | **13/14** on the first real run |
 
 How to read these numbers honestly:
-- **The 18/18 is not a blind test.** The two misses on the first run were a question that counted result rows instead of
-  distinct races and a filter that compared a number column with quoted text. I changed the chat's rules and added a check
-  that blocks the second mistake before it runs, then re-ran the same 18 questions. The fix is real, but the score is on
-  questions I had already seen. A fresh, unseen question set is the right next test.
+- **The one miss is a real finding, not noise.** For "which customer state placed the most orders", the AI answered
+  from the flattened order-items table, which only has a row for orders that have at least one item — it undercounted
+  the states that way. The raw `orders` table it also had access to would have given the right answer; it chose the
+  flattened one anyway. The wrong cached reply was removed rather than patched, so that one question has no saved
+  answer on the public demo right now and needs a Gemini key to answer it live until it is re-recorded.
 - **The checker is automatic.** It compares numbers and names in the answer with the expected ones, so it has limits.
   It can mark a correct answer wrong if it is phrased unusually, and it cannot judge explanations.
-- **The demo set is small and its questions are the ones the demo shows.** 11/11 there says the recorded answers are right
-  and replay works, not that the AI is 100% accurate.
+- **The demo set is small and its questions are the ones the demo shows.** 13/14 is one real run against one small,
+  single-month dataset, not a broad accuracy claim.
 
 Run them yourself (needs your Gemini key, see below):
 ```
-python scripts/eval_f1.py "<folder with the 14 Formula 1 csv files>"     # the 18-question test
-python scripts/eval_f1.py --demo                                          # the 11-question demo test
+python scripts/eval_olist.py "<folder with the Olist csv files>"          # the 14-question test on the full dataset
+python scripts/eval_olist.py --demo                                       # the same 14 questions on the small demo set
 python scripts/eval_chat.py                                               # a 30-question test on a single table
 ```
 Reports are written to `eval_results/`.
@@ -132,7 +133,7 @@ ui/                      the dashboard, chat and key panels
 evals/ and scripts/      the accuracy tests and helper scripts
 tests/                   automated tests
 deploy/demo_cache.json   the saved demo answers
-sample_data/             a small sales file and the Formula 1 demo set
+sample_data/             a small sales file and the Olist e-commerce demo set
 ```
 
 ## How it was tested
@@ -145,7 +146,7 @@ sample_data/             a small sales file and the Formula 1 demo set
 
 ## Known limits
 
-- The 18-question score is not blind (see above).
+- The 13/14 score is one run, not blind, and not a broad accuracy claim (see above).
 - The "do not merge two event tables" guard is a rule of thumb on the code text. It stops the common mistake, not every mistake.
 - Very wide tables get fewer filters, and big files are slow or refused on the free host (15 MB per file, 30 MB in total).
 - The free host goes to sleep when nobody uses it, so the first visit can take a short while.
@@ -153,7 +154,8 @@ sample_data/             a small sales file and the Formula 1 demo set
 
 ## Data credit
 
-The Formula 1 demo set is a subset (seasons 2021 and 2022) of
-[Formula 1 World Championship (1950 - 2024)](https://www.kaggle.com/datasets/rohanrao/formula-1-world-championship-1950-2020)
-by Rohan Rao on Kaggle, listed there as **CC0: Public Domain**. The underlying results come from the Ergast F1 database.
-See [DATA_LICENSE.md](DATA_LICENSE.md). This project is free and non-commercial.
+The Olist demo set is a subset (orders placed in October-November 2017, plus the rows they point to) of the
+[Brazilian E-Commerce Public Dataset by Olist](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) on
+Kaggle, listed there as **CC BY-NC-SA 4.0** (attribution, non-commercial, share-alike). See
+[DATA_LICENSE.md](DATA_LICENSE.md). This project is free and non-commercial; the data's licence does not allow
+commercial use.

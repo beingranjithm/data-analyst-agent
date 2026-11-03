@@ -27,7 +27,7 @@ pastes **their own** Gemini key, so your key and your quota are never used.
 - Result of the first real test on Streamlit Community Cloud: the host does NOT allow the file-system lock, so the Chat tab says
   "Live calculations are switched off on this host". The saved demo answers still work (recorded code runs); a visitor's own key gets summary-only chat
   and fixed-rule dashboards. A host with the lock would allow live calculations.
-- Uploading the F1 files stays inside the limits (or shows the friendly size message).
+- Uploading the Olist files stays inside the limits (or shows the friendly size message).
 - Nothing about your own key appears anywhere. Never put your key in the Secrets box.
 
 ## Honest limits
@@ -40,14 +40,16 @@ pastes **their own** Gemini key, so your key and your quota are never used.
 In the Streamlit dashboard, open the app's menu and delete the app. Making the GitHub repository private also stops new deploys.
 
 ## Recording the demo answers (once, and again whenever the AI's prompts or the data change)
-The public demo opens on a small Formula 1 set (seasons 2021 and 2022) and answers the listed questions from saved replies, so
-visitors need no key. The saved replies are a file in the repository: `deploy/demo_cache.json`.
-1. Build the demo set once: `python scripts/build_demo_f1.py "/path/to/F1 Data Set"` (writes `sample_data/f1_demo/`, about 2 MB).
-   Check the dataset's licence first and keep its attribution in the README.
-2. Record the chat answers (about 25 real Gemini requests; needs your key in `hello_agent/.env`):
-   `python scripts/eval_f1.py --demo`. It also scores them against answers computed with plain pandas. Fix or re-run until you are happy.
-3. Record one dashboard: `DAA_CACHE_PATH=deploy/demo_cache.json streamlit run app/streamlit_app.py`, choose "Formula 1 demo set",
-   open the AI dashboard tab, leave all settings as they are, press Plan, then approve. (Do not change "Maximum charts".)
-4. Commit `sample_data/f1_demo/` and `deploy/demo_cache.json`. A reply is only found again when the request is exactly the same, so
+The public demo opens on a small Olist e-commerce set (orders from October-November 2017) and answers the listed
+questions from saved replies, so visitors need no key. The saved replies are a file in the repository:
+`deploy/demo_cache.json`.
+1. Build the demo set once: `python scripts/build_demo_olist.py "/path/to/Olist Data Set"` (writes `sample_data/olist_demo/`).
+   Check the dataset's licence first and keep its attribution in the README — Olist's licence (CC BY-NC-SA 4.0) is
+   non-commercial and requires attribution, unlike a public-domain dataset.
+2. Record the chat answers (needs your key in `hello_agent/.env`):
+   `python scripts/eval_olist.py --demo`. It also scores them against answers computed with plain pandas. Fix or re-run until you are happy.
+3. Record one dashboard: `DAA_CACHE_PATH=deploy/demo_cache.json streamlit run app/streamlit_app.py`, choose "Olist e-commerce
+   demo set (Nov 2017)", open the AI dashboard tab, leave all settings as they are, press Plan, then approve. (Do not change "Maximum charts".)
+4. Commit `sample_data/olist_demo/` and `deploy/demo_cache.json`. A reply is only found again when the request is exactly the same, so
    after any change to the prompts, the code that builds them, or the data, record again.
-5. Check: `python scripts/eval_f1.py --demo --replay` must answer every question (all PASS) with 0 real requests.
+5. Check: `python scripts/eval_olist.py --demo --replay` must answer every question (all PASS) with 0 real requests.
