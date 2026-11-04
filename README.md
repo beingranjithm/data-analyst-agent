@@ -3,6 +3,10 @@
 Upload one or more CSV files and get an **AI-planned dashboard** you approve chart by chart, plus a **chat** that answers
 questions about your data and shows the calculation behind every number.
 
+[![Watch the 2-minute tour](docs/assets/demo-preview.jpg)](https://beingranjithm.github.io/data-analyst-agent/#demo)
+
+*Click the image to watch the 2-minute tour (with captions) on the project page.*
+
 **Live demo (free, no sign-up): https://analystiq-agent.streamlit.app**
 It opens on a small Olist e-commerce data set (Brazilian orders, November 2017). The saved demo questions and the demo
 dashboard work without any key.
