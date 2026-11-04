@@ -168,6 +168,37 @@
   .shot.wide { grid-column: 1 / -1; }
   .shot.wide figcaption { max-width: 70ch; }
 
+  /* ---------- architecture diagram ---------- */
+  .arch-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .arch { display: block; width: 100%; min-width: 760px; height: auto; font-family: "IBM Plex Sans", system-ui, sans-serif; }
+  .arch .lane { fill: var(--paper-raised); stroke: var(--line); }
+  .arch .lane-title { font-size: 13px; font-weight: 600; fill: var(--ink-muted); }
+  .arch .node rect { fill: var(--card); stroke: var(--line); stroke-width: 1.2; }
+  .arch .node text { font-size: 13.5px; fill: var(--ink); text-anchor: middle; font-weight: 500; }
+  .arch .node text.small { font-size: 11.5px; fill: var(--ink-muted); font-weight: 400; }
+  .arch .node.ai rect { fill: var(--accent-soft); stroke: var(--accent); }
+  .arch .node.human rect { stroke: var(--ok); stroke-width: 1.6; }
+  .arch .node.out rect { stroke: var(--ink-muted); }
+  .arch .sbx rect { fill: var(--panel); stroke: var(--panel-line); }
+  .arch .sbx text { font-size: 12.5px; fill: var(--panel-fg); text-anchor: middle; }
+  .arch .sbx .sbx-title { font-size: 15px; font-weight: 600; fill: #fff; }
+  .arch .sbx .sbx-note { font-size: 11.5px; fill: var(--panel-fg-dim); }
+  .arch .edge { fill: none; stroke: var(--ink-muted); stroke-width: 1.4; }
+  .arch .edge.strong { stroke: var(--accent-deep); stroke-width: 2; }
+  .arch .edge.dashed { stroke-dasharray: 5 4; }
+  .arch .arrowhead { fill: var(--ink-muted); }
+  .arch .edge-label { font-size: 11px; fill: var(--ink-muted); text-anchor: middle; }
+  .arch .pill { fill: var(--card); stroke: var(--accent-deep); }
+  .arch .pill-text { font-size: 12.5px; fill: var(--accent-deep); text-anchor: middle; font-weight: 600; }
+  .arch-legend { font-size: 13px; color: var(--ink-muted); margin: 12px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; }
+  .arch-legend .key { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; border: 1.4px solid; }
+  .arch-legend .key.ai { background: var(--accent-soft); border-color: var(--accent); }
+  .arch-legend .key.human { background: var(--card); border-color: var(--ok); }
+  .arch-legend .key.sbx { background: var(--panel); border-color: var(--panel-line); }
+  .arch-intro { margin-top: 36px; }
+  .arch-hint { display: none; font-size: 12.5px; color: var(--ink-muted); margin: 8px 0 0; }
+  @media (max-width: 800px) { .arch-hint { display: block; } }
+
   /* ---------- feature rows with icons ---------- */
   .rows { border-top: 1px solid var(--line); }
   .row { display: grid; grid-template-columns: 34px 180px 1fr; gap: 18px; padding: 20px 0; border-bottom: 1px solid var(--line); align-items: start; }
@@ -322,6 +353,90 @@
           visible warning instead of being stated as fact.</p></div>
       </div>
     </div>
+    <h3 class="arch-intro">The pieces, in one picture</h3>
+    <p class="section-intro">Only a text summary of the data reaches the AI. Code the AI writes runs on the real data in a
+      sandbox, and only a small result comes back.</p>
+    <div class="arch-scroll" style="margin-top:28px;">
+      <svg class="arch" viewBox="0 0 1000 492" role="img" aria-labelledby="arch-title arch-desc">
+        <title id="arch-title">How the app is built</title>
+        <desc id="arch-desc">Step 1, with no AI: upload CSV files, load and clean them, link the files by comparing values, and
+          profile them into a text summary. Only that text summary, never the rows, goes to the AI. Step 2: a planner
+          agent proposes KPIs and charts, you approve the plan, and a chart agent writes Plotly code for each chart; if a
+          chart still fails after 3 tries, a rule-based builder makes it; the result is a dashboard with an HTML download.
+          Step 3: a chat agent answers questions, with a "Show the calculation" panel. Both agents send code to a sandbox
+          (a separate process with no network, a static code check and a file-system lock), which returns a chart, a
+          small result of at most 20 rows, or an error with data values removed.</desc>
+        <defs>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0L10 5L0 10z" class="arrowhead"/>
+          </marker>
+        </defs>
+
+        <!-- 1 . prepare -->
+        <rect class="lane" x="20" y="20" width="960" height="118" rx="10"/>
+        <text class="lane-title" x="40" y="44">1 · Prepare the data, with no AI</text>
+        <g class="node"><rect x="44" y="62" width="196" height="54" rx="7"/><text x="142" y="94">Upload CSV files</text></g>
+        <g class="node"><rect x="284" y="62" width="196" height="54" rx="7"/><text x="382" y="94">Load and clean</text></g>
+        <g class="node"><rect x="524" y="62" width="196" height="54" rx="7"/><text x="622" y="85">Link the files by</text><text x="622" y="104">comparing values</text></g>
+        <g class="node"><rect x="764" y="62" width="196" height="54" rx="7"/><text x="862" y="85">Profile: a text</text><text x="862" y="104">summary of the data</text></g>
+        <path class="edge" d="M240 89H281" marker-end="url(#arr)"/>
+        <path class="edge" d="M480 89H521" marker-end="url(#arr)"/>
+        <path class="edge" d="M720 89H761" marker-end="url(#arr)"/>
+
+        <!-- the summary goes down to both agents -->
+        <path class="edge strong" d="M862 116V170H110V241" marker-end="url(#arr)"/>
+        <path class="edge strong" d="M862 170H870V241" marker-end="url(#arr)"/>
+        <rect class="pill" x="333" y="158" width="334" height="24" rx="12"/>
+        <text class="pill-text" x="500" y="174.5">text summary only · never the rows</text>
+
+        <!-- 2 . dashboard -->
+        <rect class="lane" x="20" y="200" width="500" height="272" rx="10"/>
+        <text class="lane-title" x="40" y="458">2 · Build a dashboard</text>
+        <g class="node ai"><rect x="40" y="244" width="140" height="56" rx="7"/><text x="110" y="267">Planner agent</text><text class="small" x="110" y="286">proposes KPIs, charts</text></g>
+        <g class="node human"><rect x="200" y="244" width="140" height="56" rx="7"/><text x="270" y="267">You approve</text><text class="small" x="270" y="286">or untick charts</text></g>
+        <g class="node ai"><rect x="360" y="244" width="140" height="56" rx="7"/><text x="430" y="267">Chart agent</text><text class="small" x="430" y="286">writes Plotly code</text></g>
+        <path class="edge" d="M180 272H197" marker-end="url(#arr)"/>
+        <path class="edge" d="M340 272H357" marker-end="url(#arr)"/>
+        <g class="node"><rect x="200" y="368" width="140" height="56" rx="7"/><text x="270" y="391">Rule-based</text><text class="small" x="270" y="410">chart builder</text></g>
+        <g class="node out"><rect x="360" y="368" width="140" height="56" rx="7"/><text x="430" y="391">Dashboard</text><text class="small" x="430" y="410">+ HTML download</text></g>
+        <path class="edge" d="M430 300V365" marker-end="url(#arr)"/>
+        <path class="edge dashed" d="M395 300L300 365" marker-end="url(#arr)"/>
+        <text class="edge-label" x="318" y="330">fails 3 times</text>
+        <path class="edge dashed" d="M340 396H357" marker-end="url(#arr)"/>
+
+        <!-- sandbox -->
+        <g class="sbx">
+          <rect x="570" y="232" width="160" height="196" rx="9"/>
+          <text class="sbx-title" x="650" y="262">Sandbox</text>
+          <text x="650" y="292">separate process</text>
+          <text x="650" y="314">no network, no keys</text>
+          <text x="650" y="336">static code check</text>
+          <text x="650" y="358">file-system lock</text>
+          <text class="sbx-note" x="650" y="392">sends back a small</text>
+          <text class="sbx-note" x="650" y="410">result, never the table</text>
+        </g>
+        <path class="edge" d="M500 262H567" marker-end="url(#arr)"/>
+        <path class="edge" d="M570 286H503" marker-end="url(#arr)"/>
+        <text class="edge-label" x="535" y="255">code</text>
+        <text class="edge-label" x="535" y="302">chart or</text>
+        <text class="edge-label" x="535" y="316">clean error</text>
+
+        <!-- 3 . chat -->
+        <rect class="lane" x="770" y="200" width="210" height="272" rx="10"/>
+        <text class="lane-title" x="790" y="458">3 · Ask questions</text>
+        <g class="node ai"><rect x="800" y="244" width="140" height="56" rx="7"/><text x="870" y="267">Chat agent</text><text class="small" x="870" y="286">plain-English questions</text></g>
+        <g class="node out"><rect x="800" y="368" width="140" height="56" rx="7"/><text x="870" y="391">Answer, with</text><text class="small" x="870" y="410">"Show the calculation"</text></g>
+        <path class="edge" d="M870 300V365" marker-end="url(#arr)"/>
+        <path class="edge" d="M800 262H733" marker-end="url(#arr)"/>
+        <path class="edge" d="M730 286H797" marker-end="url(#arr)"/>
+        <text class="edge-label" x="758" y="255">code</text>
+        <text class="edge-label" x="760" y="302">result</text>
+        <text class="edge-label" x="760" y="316">≤ 20 rows</text>
+      </svg>
+    </div>
+    <p class="arch-hint">Scroll sideways to see the whole picture →</p>
+    <p class="arch-legend"><span><span class="key ai"></span>AI agent (Gemini)</span>
+      <span><span class="key human"></span>You decide</span><span><span class="key sbx"></span>Where AI-written code runs</span></p>
   </div>
 </section>
 
