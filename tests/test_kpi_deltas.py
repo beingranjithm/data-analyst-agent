@@ -3,7 +3,8 @@ fallback when there's no usable date column or not enough span to compare two pe
 import pandas as pd
 
 from tools.kpi_deltas import (compute_kpi_delta, compute_kpi_deltas, lower_is_better,
-                              pick_comparison_window)
+                              pick_comparison_window, preferred_time_column, window_is_balanced)
+from tools.plan_schema import ChartSpec, DashboardPlan
 from tools.plan_schema import KpiSpec
 
 PROFILE_NO_TIME = {"time_column": None, "columns": []}
@@ -122,3 +123,61 @@ def test_compute_kpi_deltas_keyed_by_label_and_skips_unsupported_kpis():
             KpiSpec(label="Ghost", measure="nope", agg="sum")]
     out = compute_kpi_deltas(df, kpis, PROFILE_60_DAYS)
     assert list(out.keys()) == ["Revenue"] and out["Revenue"].direction == "up"
+
+
+# ---- Day 26: which date to compare on, and refusing lopsided comparisons ----
+PROFILE_TWO_DATES = {"time_column": "deadline", "columns": [
+    {"name": "deadline", "role": "datetime", "min": "2026-01-07", "max": "2026-03-10", "span_days": 62},
+    {"name": "ordered", "role": "datetime", "min": "2026-01-01", "max": "2026-01-30", "span_days": 29},
+    {"name": "revenue", "role": "numeric"}]}
+
+
+def _plan(*charts):
+    return DashboardPlan(title="t", summary="s", charts=list(charts) or [
+        ChartSpec(type="histogram", title="h", measure="revenue")])
+
+
+def test_the_planners_trend_chart_picks_the_date_to_compare_on():
+    plan = _plan(ChartSpec(type="line", title="t", time="ordered", measure="revenue", agg="sum"))
+    assert preferred_time_column(plan, PROFILE_TWO_DATES) == "ordered"
+
+
+def test_without_a_trend_chart_the_profiles_time_column_is_used():
+    assert preferred_time_column(_plan(), PROFILE_TWO_DATES) == "deadline"
+
+
+def test_a_trend_chart_on_a_column_that_is_not_a_date_is_ignored():
+    plan = _plan(ChartSpec(type="line", title="t", time="revenue", measure="revenue", agg="sum"))
+    assert preferred_time_column(plan, PROFILE_TWO_DATES) == "deadline"
+
+
+def test_the_override_changes_the_window_and_its_label():
+    w = pick_comparison_window(PROFILE_TWO_DATES, "ordered")
+    assert w.time_col == "ordered" and w.period_days == 14 and w.label == "vs previous 14 days"
+
+
+def test_a_window_where_the_current_period_holds_a_sliver_of_rows_is_refused():
+    # the Olist demo bug: a deadline date running two months past the orders put almost no rows in the
+    # "current 30 days", so revenue looked like it fell 97%
+    d = list(pd.date_range("2026-01-07", periods=60, freq="D").repeat(10)) + [pd.Timestamp("2026-03-10")]
+    df = pd.DataFrame({"deadline": d, "revenue": [1.0] * len(d)})
+    w = pick_comparison_window(PROFILE_TWO_DATES)
+    df.loc[df["deadline"] > w.current_start, "deadline"] = pd.Timestamp("2026-03-10")
+    df.loc[df.index[:-3], "deadline"] = df.loc[df.index[:-3], "deadline"].where(
+        df.loc[df.index[:-3], "deadline"] <= w.current_start, w.current_start)
+    assert not window_is_balanced(df, w)
+    assert compute_kpi_deltas(df, [KpiSpec(label="Revenue", measure="revenue", agg="sum")], PROFILE_TWO_DATES) == {}
+
+
+def test_an_even_spread_of_rows_is_balanced():
+    df = _daily_df("2026-01-01", 60, [1.0] * 60)
+    assert window_is_balanced(df, pick_comparison_window(PROFILE_60_DAYS))
+
+
+def test_compute_kpi_deltas_uses_the_given_time_column():
+    df = pd.DataFrame({"ordered": pd.date_range("2026-01-01", periods=30, freq="D"),
+                       "deadline": pd.date_range("2026-01-07", periods=30, freq="2D"),
+                       "revenue": [10.0] * 15 + [20.0] * 15})
+    kpis = [KpiSpec(label="Revenue", measure="revenue", agg="sum")]
+    out = compute_kpi_deltas(df, kpis, PROFILE_TWO_DATES, "ordered")
+    assert out["Revenue"].direction == "up" and out["Revenue"].good is True

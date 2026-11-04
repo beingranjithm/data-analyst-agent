@@ -1,6 +1,6 @@
 # Data credit and licence
 
-The files in `sample_data/olist_demo/` are a subset (orders placed in October-November 2017, plus the rows they
+The files in `sample_data/olist_demo/` are a subset (orders placed in November 2017, plus the rows they
 point to) of the Kaggle dataset **Brazilian E-Commerce Public Dataset by Olist**:
 https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce
 

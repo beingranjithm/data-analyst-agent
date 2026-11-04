@@ -40,7 +40,7 @@ pastes **their own** Gemini key, so your key and your quota are never used.
 In the Streamlit dashboard, open the app's menu and delete the app. Making the GitHub repository private also stops new deploys.
 
 ## Recording the demo answers (once, and again whenever the AI's prompts or the data change)
-The public demo opens on a small Olist e-commerce set (orders from October-November 2017) and answers the listed
+The public demo opens on a small Olist e-commerce set (orders from November 2017) and answers the listed
 questions from saved replies, so visitors need no key. The saved replies are a file in the repository:
 `deploy/demo_cache.json`.
 1. Build the demo set once: `python scripts/build_demo_olist.py "/path/to/Olist Data Set"` (writes `sample_data/olist_demo/`).

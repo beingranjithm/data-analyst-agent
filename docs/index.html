@@ -159,6 +159,8 @@
   .shot img { display: block; width: 100%; height: auto; }
   .shot figcaption { font-size: 13.5px; color: var(--ink-muted); margin-top: 10px; max-width: 52ch; }
   .shot figcaption strong { color: var(--ink); font-weight: 600; }
+  .shot.wide { grid-column: 1 / -1; }
+  .shot.wide figcaption { max-width: 70ch; }
 
   /* ---------- feature rows with icons ---------- */
   .rows { border-top: 1px solid var(--line); }
@@ -271,7 +273,7 @@
       <div class="step-row">
         <div class="num mono">01</div>
         <div><h3>Upload</h3><p>Add one or more CSV files, or open the Olist e-commerce demo: 8 linked tables of
-          Brazilian orders from October–November 2017. Every file is cleaned and profiled automatically. The
+          Brazilian orders from November 2017. Every file is cleaned and profiled automatically. The
           relationships between files — which column points to which row of another — are found without AI, by
           comparing values, and lookup columns are joined on without adding or losing a single row.</p></div>
       </div>
@@ -285,7 +287,8 @@
         <div><h3>Build</h3><p>A chart agent writes the code for each chart and a sandbox runs it. A failed
           chart gets its error message (scrubbed of data values) and fixes its own code, up to 3 attempts;
           a rule-based builder fills in anything that still fails, so a dashboard always comes out. It opens
-          with KPI cards and a data-health note, and downloads as a single web page.</p></div>
+          with KPI cards that compare the latest period with the one before, chart titles computed from the data,
+          and a data-health note, and downloads as a single web page.</p></div>
       </div>
       <div class="step-row">
         <div class="num mono">04</div>
@@ -311,6 +314,12 @@
         <div class="frame"><a href="assets/plan-review.png"><img src="assets/plan-review.png" width="1400" height="1270" loading="lazy" alt="The 'Review the plan' step: the AI's summary, the four KPIs it chose (total revenue, total freight value, average item price, average package weight), an editable dashboard title, and six charts to build, each with a checkbox and a one-line reason."></a></div>
         <figcaption><strong>You approve the plan first.</strong> The planner proposes KPIs and charts with a reason for
           each; untick what you don't want, rename the dashboard, then build.</figcaption>
+      </figure>
+      <figure class="shot wide">
+        <div class="frame"><a href="assets/ai-dashboard.png"><img src="assets/ai-dashboard.png" width="1400" height="1225" loading="lazy" alt="The finished AI dashboard for the Olist demo: title 'E-Commerce Sales and Logistics Dashboard', covering 1 to 30 November 2017 and 8,665 rows; a data-health note; four KPI cards (total revenue 1,010,271, up 103.6% on the previous 14 days; total freight value 168,872, up 108.2%; average item price 116.59, down 3.8%; average package weight 2,105 g, down 10.1%); a daily revenue line titled 'Total price peaked on 24 Nov 2017 (152.7K)'; and a bar chart of the top product categories titled 'watches_gifts leads with 10% of total price'."></a></div>
+        <figcaption><strong>The finished dashboard.</strong> KPI cards compare the last 14 days with the 14 before; each
+          chart's title is a fact computed from the data (here, the Black Friday peak on 24 November), and a note
+          says how many rows a chart left out.</figcaption>
       </figure>
     </div>
   </div>
@@ -363,7 +372,7 @@
 <section id="evaluation" class="tint">
   <div class="wrap">
     <div class="section-head"><h2>Evaluation</h2></div>
-    <p class="section-intro">Olist e-commerce demo set (October–November 2017, 8 tables), answered live by Gemini.
+    <p class="section-intro">Olist e-commerce demo set (November 2017, 8 tables), answered live by Gemini.
       Each answer is checked against a result computed independently with plain pandas on the same data.</p>
     <div class="table-scroll" style="margin-top:24px;">
       <table class="eval-table">
@@ -429,7 +438,7 @@ echo "GOOGLE_API_KEY=your-key-here" &gt; hello_agent/.env<br>
 streamlit run app/streamlit_app.py</div>
     <p class="section-intro" style="margin-top:16px;">Full setup, architecture diagram and test notes are in the <a href="https://github.com/beingranjithm/data-analyst-agent#readme">README</a>.</p>
     <p class="section-intro" style="margin-top:12px;"><strong>Data credit.</strong> The demo set is a subset (orders placed in
-      October–November 2017, plus the rows they point to) of the
+      November 2017, plus the rows they point to) of the
       <a href="https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce">Brazilian E-Commerce Public Dataset by Olist</a>
       on Kaggle, licensed <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a>
       (attribution, non-commercial, share-alike). This project is free and non-commercial; see

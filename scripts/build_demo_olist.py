@@ -1,6 +1,6 @@
 """Day 25: makes the small Olist Brazilian e-commerce demo set from the 8 full files. Run from the project root:
-    python scripts/build_demo_olist.py "/path/to/olist files folder"                 (default window: Oct-Nov 2017)
-    python scripts/build_demo_olist.py "/path/to/olist files folder" --start 2017-10-15 --end 2017-11-30
+    python scripts/build_demo_olist.py "/path/to/olist files folder"                 (default window: November 2017)
+    python scripts/build_demo_olist.py "/path/to/olist files folder" --start 2017-11-01 --end 2017-11-30
 It keeps every order placed in that window, every row that belongs to those orders (items, payments, reviews), and
 only the customers, products and sellers those rows point to, so all the links between the tables still work.
 Output goes to sample_data/olist_demo/. Check the data's licence (CC BY-NC-SA 4.0, Olist/Kaggle) and keep its

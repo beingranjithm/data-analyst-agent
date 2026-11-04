@@ -69,3 +69,13 @@ def test_data_health_note_never_blames_id_or_empty_columns():
                "columns": [{"name": "order_id", "role": "id", "missing_pct": 5.0},
                            {"name": "blank", "role": "empty", "missing_pct": 100.0}]}
     assert data_health_note(profile) == "Data health: no missing values found in this dataset."
+
+
+def test_coverage_subtitle_can_use_the_dashboards_own_date_column():
+    # Day 26: the Olist demo said "Data from 2017-11-07 to 2018-01-10" (a shipping deadline) for orders
+    # placed in November 2017
+    profile = {"dataset": {"rows": 10, "columns": 3}, "time_column": "deadline", "columns": [
+        {"name": "deadline", "role": "datetime", "min": "2017-11-07", "max": "2018-01-10"},
+        {"name": "ordered", "role": "datetime", "min": "2017-11-01", "max": "2017-11-30"}]}
+    assert coverage_subtitle(profile) == "Data from 2017-11-07 to 2018-01-10 · 10 rows"
+    assert coverage_subtitle(profile, "ordered") == "Data from 2017-11-01 to 2017-11-30 · 10 rows"

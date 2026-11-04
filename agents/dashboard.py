@@ -20,8 +20,9 @@ from tools.change_cards import build_change_cards
 from tools.charts import build_chart, suggest_charts
 from tools.dashboard_header import coverage_subtitle, data_health_note, format_header_title
 from tools.figure_checks import check_figure
+from tools.figure_style import tidy_figure, wrap_title
 from tools.insights import chart_insight_title
-from tools.kpi_deltas import compute_kpi_deltas, pick_comparison_window
+from tools.kpi_deltas import compute_kpi_deltas, pick_comparison_window, preferred_time_column
 from tools.plan_kpis import KpiValue, compute_plan_kpis
 from tools.plan_schema import ChartSpec, DashboardPlan
 from tools.title_check import title_warnings
@@ -93,6 +94,8 @@ def _finish(fig, chart: ChartSpec, df: Optional[pd.DataFrame] = None):
     insight can be computed, the original title (AI or rule-based) is left as-is.
     """
     check = check_figure(fig)
+    if check.ok:                                # Day 26: one light style, notes clear of the axis title
+        tidy_figure(fig)
     if check.ok and check.missing_title:
         fig.update_layout(title_text=chart.title)
     shown_title = chart.title
@@ -110,6 +113,11 @@ def _finish(fig, chart: ChartSpec, df: Optional[pd.DataFrame] = None):
         warnings += title_warnings(shown, getattr(chart, "measure", None))
     except Exception:
         pass
+    if check.ok:                               # Day 26: long titles wrap instead of being cut off
+        try:
+            wrap_title(fig)
+        except Exception:
+            pass
     return fig, check.problems, warnings
 
 
@@ -175,10 +183,14 @@ async def build_dashboard_async(df: pd.DataFrame, profile: dict, model=DEFAULT_M
         kpis = []
         notes.append(f"KPIs could not be computed: {type(e).__name__}")
     comparison_label = ""
+    try:                                        # Day 26: the date the dashboard is about (the planner's trend
+        time_col = preferred_time_column(plan, profile)        # chart), not just the first date-like column
+    except Exception:
+        time_col = profile.get("time_column")
     try:                                        # Phase B: period-over-period deltas (graceful: {} when
-        deltas = compute_kpi_deltas(df, plan.kpis, profile)   # there's no usable date column/span)
+        deltas = compute_kpi_deltas(df, plan.kpis, profile, time_col)
         if deltas:
-            window = pick_comparison_window(profile)
+            window = pick_comparison_window(profile, time_col)
             comparison_label = window.label if window else ""
             for k in kpis:
                 d = deltas.get(k.label)
@@ -222,7 +234,7 @@ async def build_dashboard_async(df: pd.DataFrame, profile: dict, model=DEFAULT_M
             outcomes.append(ChartOutcome(chart, False, None, "", attempts, code, msg, ai_message))
     emit("done", len(charts), len(charts), "Dashboard ready.")
     try:                                        # Phase A: header framing + data-health banner
-        coverage = coverage_subtitle(profile)
+        coverage = coverage_subtitle(profile, time_col)
         health = data_health_note(profile)
         header_title = format_header_title(plan.title)
     except Exception:                          # never let header framing break the dashboard

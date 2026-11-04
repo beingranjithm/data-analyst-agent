@@ -21,11 +21,13 @@ def format_header_title(title: str) -> str:
     return f"{title} overview"
 
 
-def coverage_subtitle(profile: dict) -> str:
-    """What this dashboard actually covers: a date range when there is one, else row/column counts."""
+def coverage_subtitle(profile: dict, time_col: Optional[str] = None) -> str:
+    """What this dashboard actually covers: a date range when there is one, else row/column counts.
+    `time_col` overrides the profile's time column (Day 26: the date the dashboard's trend chart is about,
+    see tools.kpi_deltas.preferred_time_column)."""
     d = profile.get("dataset", {})
     rows = d.get("rows", 0)
-    time_col = profile.get("time_column")
+    time_col = time_col or profile.get("time_column")
     if time_col:
         col = next((c for c in profile.get("columns", []) if c["name"] == time_col), None)
         if col and col.get("min") and col.get("max"):
