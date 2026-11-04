@@ -13,7 +13,7 @@ def render_links_panel(frames: dict, links: list, sig: str):
     others = [l for l in links if l.kind != "many-to-one"]
     with st.expander(f"🔗 {len(frames)} tables and {len(joinable)} links found", expanded=True):
         st.caption("The app compared the columns of your files. A link means: every value in the first column also "
-                   "exists in the second, and the second has no repeats (for example results.driverId → drivers.driverId). "
+                   "exists in the second, and the second has no repeats (for example order_items.order_id → orders.order_id). "
                    "Untick a link that is wrong. Rows are never added or removed.")
         st.dataframe(pd.DataFrame({"table": order, "rows": [len(frames[t]) for t in order],
                                    "columns": [frames[t].shape[1] for t in order]}),
