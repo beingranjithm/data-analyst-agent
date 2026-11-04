@@ -36,20 +36,29 @@ Built with Google ADK 2.x (agents), Gemini, pandas, Plotly and Streamlit.
 ## How it works
 
 ```mermaid
-flowchart LR
-    U[Upload CSV files] --> L[Loader and cleaner]
-    L --> P[Profiler: text summary of the data]
-    L --> R[Relationship finder - no AI]
-    P --> PL[Planner agent proposes a dashboard]
-    PL --> A[You approve the plan]
-    A --> CA[Chart agent writes code]
-    CA --> S[Sandbox runs the code on the data]
-    S -- "error, cleaned of data values" --> CA
-    S --> D[Dashboard and HTML download]
-    P --> C[Chat agent]
-    R --> C
-    C -- "pandas code" --> S
-    S -- "small result, at most 20 rows" --> C
+flowchart TB
+    subgraph PREP["1 · Prepare the data, with no AI"]
+        direction LR
+        U[Upload CSV files] --> L[Load and clean] --> R[Link the files by<br/>comparing values] --> P[Profile: a text<br/>summary of the data]
+    end
+
+    PREP == "text summary only, never the rows" ==> PL
+    PREP == "text summary only" ==> C
+
+    subgraph DASH["2 · Build a dashboard"]
+        PL[Planner agent proposes<br/>KPIs and charts] --> A{{You approve the plan}}
+        A --> CA[Chart agent writes<br/>Plotly code per chart]
+        CA --> D[Dashboard and<br/>HTML download]
+        CA -. "fails 3 times" .-> RB[Rule-based<br/>chart builder] -.-> D
+    end
+
+    subgraph CHAT["3 · Ask questions"]
+        C[Chat agent] --> ANS["Answer, with<br/>'Show the calculation'"]
+    end
+
+    CA <-- "code ⇄ chart, or error<br/>with data values removed" --> S
+    C <-- "pandas code ⇄ result,<br/>at most 20 rows" --> S
+    S[("Sandbox: separate process, no network,<br/>static check, file-system lock")]
 ```
 
 The agents see a **text summary** of the data (column types, ranges, averages, categories), not the table. Code written by
