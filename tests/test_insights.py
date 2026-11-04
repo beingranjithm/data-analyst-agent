@@ -8,19 +8,19 @@ from tools.plan_schema import ChartSpec
 def test_bar_sum_states_leader_and_share():
     df = pd.DataFrame({"region": ["North", "South", "North", "East"], "revenue": [10.0, 20.0, 45.0, 25.0]})
     chart = ChartSpec(type="bar", title="x", dimension="region", measure="revenue", agg="sum")
-    assert chart_insight_title(df, chart) == "North leads with 55% of revenue"
+    assert chart_insight_title(df, chart) == "North leads with 55% of total revenue"
 
 
 def test_donut_sum_states_leader_and_share():
     df = pd.DataFrame({"channel": ["Organic", "Paid", "Organic"], "revenue": [38.0, 32.0, 30.0]})
     chart = ChartSpec(type="donut", title="x", dimension="channel", measure="revenue", agg="sum")
-    assert chart_insight_title(df, chart) == "Organic leads with 68% of revenue"
+    assert chart_insight_title(df, chart) == "Organic leads with 68% of total revenue"
 
 
 def test_bar_count_states_leader_and_share():
     df = pd.DataFrame({"status": ["Open", "Open", "Open", "Closed"], "order_id": [1, 2, 3, 4]})
     chart = ChartSpec(type="bar", title="x", dimension="status", measure="order_id", agg="count")
-    assert chart_insight_title(df, chart) == "Open leads with 75% of order_id"
+    assert chart_insight_title(df, chart) == "Open accounts for 75% of rows"
 
 
 def test_bar_mean_states_highest_average_not_a_share():
@@ -29,16 +29,36 @@ def test_bar_mean_states_highest_average_not_a_share():
     assert chart_insight_title(df, chart) == "A has the highest average price (10)"
 
 
-def test_line_rising_trend_states_pct_change():
-    df = pd.DataFrame({"d": pd.date_range("2026-01-01", periods=10, freq="D"),
-                        "revenue": list(range(1, 11))})
+def test_line_rising_monthly_trend_states_pct_change():
+    df = pd.DataFrame({"d": pd.date_range("2026-01-01", periods=10, freq="MS"),
+                        "revenue": [float(v) for v in range(1, 11)]})
     chart = ChartSpec(type="line", title="x", time="d", measure="revenue", agg="sum")
-    insight = chart_insight_title(df, chart)
-    assert insight is not None and "rose" in insight and "revenue" in insight
+    assert chart_insight_title(df, chart) == "Total revenue rose 900% over the period"
+
+
+def test_daily_line_names_the_peak_instead_of_comparing_two_noisy_days():
+    # Day 26: on the Olist demo the old title compared the first and last day ("price rose 62%")
+    df = pd.DataFrame({"d": pd.date_range("2026-01-01", periods=10, freq="D"),
+                        "revenue": [5.0, 4.0, 6.0, 30.0, 7.0, 5.0, 6.0, 4.0, 5.0, 8.0]})
+    chart = ChartSpec(type="line", title="x", time="d", measure="revenue", agg="sum")
+    assert chart_insight_title(df, chart) == "Total revenue peaked on 04 Jan 2026 (30)"
+
+
+def test_daily_line_that_never_moves_gets_no_peak_title():
+    df = pd.DataFrame({"d": pd.date_range("2026-01-01", periods=10, freq="D"), "revenue": [5.0] * 10})
+    assert _line_insight(df, "d", "revenue", "sum") is None
+
+
+def test_daily_average_line_says_average():
+    df = pd.DataFrame({"d": pd.date_range("2026-01-01", periods=6, freq="D"),
+                        "unit_price": [1.0, 2.0, 9.0, 2.0, 1.0, 2.0]})
+    chart = ChartSpec(type="line", title="x", time="d", measure="unit_price", agg="mean")
+    assert chart_insight_title(df, chart) == "Average unit price peaked on 03 Jan 2026 (9)"
 
 
 def test_line_zero_starting_value_returns_none_rather_than_a_pct_change():
-    df = pd.DataFrame({"d": pd.date_range("2026-01-01", periods=10, freq="D"),
+    # monthly points (Day 26: daily series name their peak instead, so they never divide by the first value)
+    df = pd.DataFrame({"d": pd.date_range("2026-01-01", periods=10, freq="MS"),
                         "revenue": [0.0] + list(range(1, 10))})
     chart = ChartSpec(type="line", title="x", time="d", measure="revenue", agg="sum")
     assert chart_insight_title(df, chart) is None
@@ -91,3 +111,19 @@ def test_long_insight_is_truncated():
                        measure="a_very_long_measure_name_for_testing_purposes", agg="sum")
     insight = chart_insight_title(df, chart)
     assert insight is not None and len(insight) <= 90
+
+
+def test_count_share_says_rows_not_the_column_it_counted():
+    # Day 26: the Olist donut counted rows of 'price' and was titled "delivered leads with 98% of price"
+    df = pd.DataFrame({"order_status": ["delivered"] * 49 + ["shipped"], "price": [1.0] * 50})
+    chart = ChartSpec(type="donut", title="x", dimension="order_status", measure="price", agg="count")
+    assert chart_insight_title(df, chart) == "delivered accounts for 98% of rows"
+
+
+def test_column_names_are_written_as_words():
+    df = pd.DataFrame({"product_category": ["a", "b", "a"], "freight_value": [3.0, 1.0, 2.0]})
+    chart = ChartSpec(type="bar", title="x", dimension="product_category", measure="freight_value", agg="sum")
+    assert chart_insight_title(df, chart) == "a leads with 83% of total freight value"
+    scatter = ChartSpec(type="scatter", title="x", x="product_weight_g", y="freight_value")
+    df2 = pd.DataFrame({"product_weight_g": [1, 2, 3, 4, 5], "freight_value": [2, 4, 6, 8, 10]})
+    assert chart_insight_title(df2, scatter) == "Strong positive relationship between product weight g and freight value (r=1.00)"

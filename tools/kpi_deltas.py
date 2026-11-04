@@ -22,6 +22,7 @@ from tools.charts import AGG_FUNCS
 MIN_SPAN_DAYS = 4          # need at least this much span to form two periods worth comparing
 MAX_PERIOD_DAYS = 30       # "vs previous 30 days" once there's enough data; shorter spans use half
 NEUTRAL_PCT = 1.0          # a move smaller than this is shown as flat, not a win or a risk
+MIN_PERIOD_SHARE = 0.10    # each period must hold at least this share of the dated rows (Day 26)
 
 LOWER_IS_BETTER_HINTS = {
     "cost", "costs", "expense", "expenses", "churn", "bounce", "complaint", "complaints",
@@ -61,9 +62,24 @@ def lower_is_better(*names: str) -> bool:
     return bool(tokens & LOWER_IS_BETTER_HINTS)
 
 
-def pick_comparison_window(profile: dict) -> Optional[ComparisonWindow]:
-    """A usable "current period vs prior period" window, or None when the data can't support one."""
-    time_col = profile.get("time_column")
+def preferred_time_column(plan, profile: dict) -> Optional[str]:
+    """The date column to compare periods on (Day 26).
+
+    The profile's time_column is simply the first date-like column, which can be a deadline or a delivery date
+    rather than when things happened (in the Olist demo it was shipping_limit_date, which runs two months past
+    the orders and made revenue look like it fell 97%). The planner's own trend chart says which date the
+    dashboard is about, so its time column wins when it is a real date column in the profile."""
+    dates = {c["name"] for c in profile.get("columns", []) if c.get("role") == "datetime"}
+    for chart in getattr(plan, "charts", None) or []:
+        if getattr(chart, "type", None) == "line" and getattr(chart, "time", None) in dates:
+            return chart.time
+    return profile.get("time_column")
+
+
+def pick_comparison_window(profile: dict, time_col: Optional[str] = None) -> Optional[ComparisonWindow]:
+    """A usable "current period vs prior period" window, or None when the data can't support one.
+    `time_col` overrides the profile's time column (see preferred_time_column)."""
+    time_col = time_col or profile.get("time_column")
     if not time_col:
         return None
     col = next((c for c in profile.get("columns", []) if c["name"] == time_col), None)
@@ -116,11 +132,25 @@ def compute_kpi_delta(df: pd.DataFrame, kpi, window: ComparisonWindow) -> Option
     return KpiDelta(pct, direction, good)
 
 
-def compute_kpi_deltas(df: pd.DataFrame, kpis, profile: dict) -> dict:
+def window_is_balanced(df: pd.DataFrame, window: ComparisonWindow, min_share: float = MIN_PERIOD_SHARE) -> bool:
+    """True when both periods hold a fair share of the dated rows. A period with only a sliver of the data
+    (e.g. the tail of a date that runs on after most rows end) would make any change look huge."""
+    if window.time_col not in df.columns:
+        return False
+    t = pd.to_datetime(df[window.time_col], errors="coerce").dropna()
+    if t.empty:
+        return False
+    current = ((t > window.current_start) & (t <= window.current_end)).sum()
+    prior = ((t > window.prior_start) & (t <= window.prior_end)).sum()
+    return min(current, prior) >= min_share * len(t)
+
+
+def compute_kpi_deltas(df: pd.DataFrame, kpis, profile: dict, time_col: Optional[str] = None) -> dict:
     """{kpi.label: KpiDelta}, computed only for the KPIs where a clean comparison is possible.
-    Returns {} outright when the dataset has no usable date/span (graceful fallback)."""
-    window = pick_comparison_window(profile)
-    if window is None:
+    Returns {} outright when the dataset has no usable date/span, or when one of the two periods holds too
+    little of the data for a fair comparison (graceful fallback: plain KPI tiles, no fabricated change)."""
+    window = pick_comparison_window(profile, time_col)
+    if window is None or not window_is_balanced(df, window):
         return {}
     out = {}
     for kpi in kpis:

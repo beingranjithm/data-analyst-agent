@@ -4,7 +4,7 @@ Upload one or more CSV files and get an **AI-planned dashboard** you approve cha
 questions about your data and shows the calculation behind every number.
 
 **Live demo (free, no sign-up): https://analystiq-agent.streamlit.app**
-It opens on a small Olist e-commerce data set (Brazilian orders, Oct-Nov 2017). The saved demo questions and the demo
+It opens on a small Olist e-commerce data set (Brazilian orders, November 2017). The saved demo questions and the demo
 dashboard work without any key.
 On the free host, a visitor's own free [Gemini API key](https://aistudio.google.com) lets the chat answer questions about an
 uploaded file from its data summary. Live AI dashboards and live calculations on your own data need a host that supports the
@@ -61,7 +61,7 @@ Accuracy is measured against answers computed independently with plain pandas on
 
 | Test | Questions | Result |
 |---|---|---|
-| Olist e-commerce demo set (Oct-Nov 2017), several tables per question, answered live by Gemini | 14 | **13/14** on the first real run |
+| Olist e-commerce demo set (November 2017), several tables per question, answered live by Gemini | 14 | **13/14** on the first real run |
 
 How to read these numbers honestly:
 - **The one miss is a real finding, not noise.** For "which customer state placed the most orders", the AI answered
@@ -138,7 +138,7 @@ sample_data/             a small sales file and the Olist e-commerce demo set
 
 ## How it was tested
 
-- **About 780 automated tests** run with fake models and a fake sandbox, so they are fast, free and repeatable.
+- **About 890 automated tests** run with fake models and a fake sandbox, so they are fast, free and repeatable.
 - **Mutation checks:** for new features I deliberately broke the code in small ways and confirmed the tests noticed, then
   added tests for the ones that slipped through.
 - **Real Gemini runs happen only in the evaluations** above and on my own computer, never in the automated tests.
@@ -154,7 +154,7 @@ sample_data/             a small sales file and the Olist e-commerce demo set
 
 ## Data credit
 
-The Olist demo set is a subset (orders placed in October-November 2017, plus the rows they point to) of the
+The Olist demo set is a subset (orders placed in November 2017, plus the rows they point to) of the
 [Brazilian E-Commerce Public Dataset by Olist](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) on
 Kaggle, listed there as **CC BY-NC-SA 4.0** (attribution, non-commercial, share-alike). See
 [DATA_LICENSE.md](DATA_LICENSE.md). This project is free and non-commercial; the data's licence does not allow

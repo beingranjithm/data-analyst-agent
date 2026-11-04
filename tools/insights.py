@@ -27,9 +27,22 @@ def _compact(x: float) -> str:
     return f"{x:,.2f}" if x % 1 else f"{x:,.0f}"
 
 
+def label(column: str) -> str:
+    """A column name as words: 'freight_value' -> 'freight value' (Day 26)."""
+    return " ".join(str(column).replace("_", " ").split())
+
+
+def measure_phrase(measure: str, agg: str) -> str:
+    """What the chart adds up, in words: 'total price', 'average review score', 'median price' (Day 26).
+    The raw column name alone ('10% of price') hid whether a chart sums, averages or counts."""
+    word = {"sum": "total", "mean": "average", "median": "median", "min": "lowest", "max": "highest"}.get(agg)
+    return f"{word} {label(measure)}" if word else label(measure)
+
+
 def _bar_or_donut_insight(df: pd.DataFrame, dimension: str, measure: str, agg: str) -> Optional[str]:
     data = df[[dimension, measure]].copy()
-    data[measure] = pd.to_numeric(data[measure], errors="coerce")
+    if agg != "count":
+        data[measure] = pd.to_numeric(data[measure], errors="coerce")
     data = data.dropna(subset=[dimension, measure])
     if data.empty:
         return None
@@ -42,14 +55,19 @@ def _bar_or_donut_insight(df: pd.DataFrame, dimension: str, measure: str, agg: s
         total = float(grouped.sum())
         if total > 0:
             share = round(100 * top_value / total)
-            return f"{top_label} leads with {share}% of {measure}"
+            if agg == "count":                       # a count adds up rows, whatever column it was given
+                return f"{top_label} accounts for {share}% of rows"
+            return f"{top_label} leads with {share}% of {measure_phrase(measure, agg)}"
     if agg == "mean":
         verb = "has the highest average"
     elif agg == "median":
         verb = "has the highest median"
     else:
-        verb = "is the largest"
-    return f"{top_label} {verb} {measure} ({_compact(top_value)})"
+        verb = "is the largest by"
+    return f"{top_label} {verb} {label(measure)} ({_compact(top_value)})"
+
+
+SHORT_GRAINS = ("D", "W")            # daily or weekly points: first-vs-last is noise, so name the peak instead
 
 
 def _line_insight(df: pd.DataFrame, time: str, measure: str, agg: str) -> Optional[str]:
@@ -63,14 +81,24 @@ def _line_insight(df: pd.DataFrame, time: str, measure: str, agg: str) -> Option
     series = data.set_index(time)[measure].resample(freq).agg(AGG_FUNCS[agg]).dropna()
     if len(series) < 2:
         return None
+    what = measure_phrase(measure, agg)
+    what = what[:1].upper() + what[1:]
+    if str(freq).upper().startswith(SHORT_GRAINS) and len(series) >= 5:
+        # Day 26: comparing the first and the last day of a daily series says more about two noisy days than
+        # about the trend ("price rose 62%"); the peak is a fact the reader can see on the chart
+        peak_at, peak = series.idxmax(), float(series.max())
+        if peak <= 0 or peak == float(series.min()):
+            return None
+        when = peak_at.strftime("%d %b %Y") if str(freq).upper().startswith("D") else f"the week of {peak_at:%d %b %Y}"
+        return f"{what} peaked on {when} ({_compact(peak)})"
     first, last = float(series.iloc[0]), float(series.iloc[-1])
     if first == 0:
         return None
     pct = round(100 * (last - first) / abs(first))
     if pct == 0:
-        return f"{measure} stayed roughly flat over the period"
+        return f"{what} stayed roughly flat over the period"
     direction = "rose" if pct > 0 else "fell"
-    return f"{measure} {direction} {abs(pct)}% over the period"
+    return f"{what} {direction} {abs(pct)}% over the period"
 
 
 def _scatter_insight(df: pd.DataFrame, x: str, y: str) -> Optional[str]:
@@ -82,14 +110,14 @@ def _scatter_insight(df: pd.DataFrame, x: str, y: str) -> Optional[str]:
         return None
     strength = "Strong" if abs(r) >= 0.7 else "Moderate" if abs(r) >= 0.4 else "Weak"
     direction = "positive" if r > 0 else "negative"
-    return f"{strength} {direction} relationship between {x} and {y} (r={r:.2f})"
+    return f"{strength} {direction} relationship between {label(x)} and {label(y)} (r={r:.2f})"
 
 
 def _histogram_insight(df: pd.DataFrame, measure: str) -> Optional[str]:
     s = pd.to_numeric(df[measure], errors="coerce").dropna()
     if len(s) < 5:
         return None
-    return f"Most {measure} values cluster around {_compact(float(s.median()))}"
+    return f"Most {label(measure)} values cluster around {_compact(float(s.median()))}"
 
 
 def chart_insight_title(df: pd.DataFrame, chart) -> Optional[str]:
