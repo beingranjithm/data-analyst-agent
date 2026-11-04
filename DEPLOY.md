@@ -53,3 +53,11 @@ questions from saved replies, so visitors need no key. The saved replies are a f
 4. Commit `sample_data/olist_demo/` and `deploy/demo_cache.json`. A reply is only found again when the request is exactly the same, so
    after any change to the prompts, the code that builds them, or the data, record again.
 5. Check: `python scripts/eval_olist.py --demo --replay` must answer every question (all PASS) with 0 real requests.
+
+## Re-recording the demo video
+The 2-minute video on the project page (`docs/assets/demo.mp4`) is recorded from the app itself, replaying the saved
+demo answers, so it needs no key. Re-record it after any visible change to the app or the demo data:
+1. Start the app in public-demo mode: `DAA_HOSTED=1 streamlit run app/streamlit_app.py --server.headless true`
+2. In a second terminal (once: `pip install playwright` and `playwright install chromium`; ffmpeg must be installed):
+   `python scripts/record_demo.py`
+3. Watch `docs/assets/demo.mp4`, then commit it. The captions and timings are in the script.
